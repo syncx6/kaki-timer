@@ -161,10 +161,10 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
         <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
           <DialogContent className="max-w-md mx-auto">
             <DialogHeader>
-                <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
-                  <User className="w-6 h-6" />
-                  {selectedUser.username}
-                </DialogTitle>
+              <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
+                <User className="w-6 h-6" />
+                {selectedUser.username}
+              </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 pt-4">

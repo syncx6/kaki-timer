@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, LogIn, X, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, LogIn, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,10 +17,8 @@ interface AuthProps {
 
 export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
   });
   const { toast } = useToast();
@@ -34,6 +32,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
       toast({
         title: "❌ Hiányzó adatok",
         description: "Felhasználónév és jelszó szükséges!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
       return;
     }
@@ -51,13 +51,15 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         toast({
           title: "❌ Foglalt felhasználónév",
           description: "Ez a felhasználónév már foglalt!",
+          className: "fixed bottom-4 right-4 z-50",
+          duration: 1000,
         });
         setIsLoading(false);
         return;
       }
 
-      // Use username as email if no email provided - use a proper domain
-      const email = formData.email || `${formData.username}@example.com`;
+      // Create user with simple username as email
+      const email = `${formData.username}@internal.app`;
       
       const { data, error } = await supabase.auth.signUp({
         email: email,
@@ -88,6 +90,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         toast({
           title: "🎉 Regisztráció sikeres!",
           description: "Üdv a WC Timer online világában!",
+          className: "fixed bottom-4 right-4 z-50",
+          duration: 1000,
         });
         onAuthSuccess();
       }
@@ -95,6 +99,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
       toast({
         title: "❌ Regisztráció sikertelen",
         description: error.message || "Valami hiba történt!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
@@ -102,34 +108,23 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignIn = async () => {
-    if ((!formData.username && !formData.email) || !formData.password) {
+    if (!formData.username || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Felhasználónév/email és jelszó szükséges!",
+        description: "Felhasználónév és jelszó szükséges!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      // Try to find user by username if no email provided
-      let email = formData.email;
-      if (!email && formData.username) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('username', formData.username)
-          .single();
-        
-        if (profile) {
-          email = `${formData.username}@example.com`;
-        } else {
-          throw new Error('Felhasználó nem található!');
-        }
-      }
+      // Use username as email
+      const email = `${formData.username}@internal.app`;
       
       const { error } = await supabase.auth.signInWithPassword({
-        email: email || formData.email,
+        email: email,
         password: formData.password,
       });
 
@@ -138,15 +133,30 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
       toast({
         title: "🎉 Bejelentkezés sikeres!",
         description: "Üdv vissza a WC Timer-ben!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
       onAuthSuccess();
     } catch (error: any) {
       toast({
         title: "❌ Bejelentkezés sikertelen",
-        description: error.message || "Helytelen email vagy jelszó!",
+        description: "Helytelen felhasználónév vagy jelszó!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const activeTab = document.querySelector('[data-state="active"]')?.getAttribute('value');
+      if (activeTab === 'signin') {
+        handleSignIn();
+      } else {
+        handleSignUp();
+      }
     }
   };
 
@@ -174,31 +184,22 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
                   placeholder="kakikiraly"
                   value={formData.username}
                   onChange={(e) => handleInputChange('username', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   disabled={isLoading}
                 />
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Jelszó</Label>
-                <div className="relative">
-                  <Input
-                    id="signin-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Input
+                  id="signin-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={isLoading}
+                />
               </div>
 
               <Button
@@ -222,43 +223,22 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
                   placeholder="kakikiraly"
                   value={formData.username}
                   onChange={(e) => handleInputChange('username', e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email cím (opcionális)</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  placeholder="pelda@email.com (nem kötelező)"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onKeyPress={handleKeyPress}
                   disabled={isLoading}
                 />
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Jelszó</Label>
-                <div className="relative">
-                  <Input
-                    id="signup-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-auto p-1"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+                <Input
+                  id="signup-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={isLoading}
+                />
               </div>
 
               <Button

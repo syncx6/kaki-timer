@@ -159,17 +159,18 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
   };
 
   const handleStopTimer = async () => {
-    if (seconds > 0) {
+    const finalSeconds = seconds; // Store the final time before resetting
+    if (finalSeconds > 0) {
       // Calculate kaki badges earned (1 per 10 minutes, max 5)
-      const minutesElapsed = Math.floor(seconds / 60);
+      const minutesElapsed = Math.floor(finalSeconds / 60);
       const kakiEarned = Math.min(Math.floor(minutesElapsed / 10) + 1, 5);
 
       const session: TimerSession = {
         id: Date.now().toString(),
-        startTime: new Date(Date.now() - seconds * 1000),
+        startTime: new Date(Date.now() - finalSeconds * 1000),
         endTime: new Date(),
-        duration: seconds,
-        earnedMoney: currentEarnings,
+        duration: finalSeconds,
+        earnedMoney: (finalSeconds / 3600) * hourlyRate,
         kaki_earned: kakiEarned,
       };
       
@@ -218,12 +219,14 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
       
       toast({
         title: "✅ Idő mentve!",
-        description: `${formatTime(seconds)} alatt ${formatMoney(currentEarnings)} Ft-ot kerestél és ${kakiEarned} 💩 jelvényt szereztél!`,
+        description: `${formatTime(finalSeconds)} alatt ${formatMoney((finalSeconds / 3600) * hourlyRate)} Ft-ot kerestél és ${kakiEarned} 💩 jelvényt szereztél!`,
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
       });
     }
     
     setIsRunning(false);
-    setSeconds(0);
+    setSeconds(finalSeconds); // Keep the final time displayed
     setLastProgressCheck(null);
   };
 
@@ -301,9 +304,6 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
                 <div className="text-2xl font-bold text-success">
                   +{formatMoney(currentEarnings)} Ft
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {formatMoney(hourlyRate)} Ft/óra díjazással
-                </div>
               </div>
             )}
           </div>
@@ -353,7 +353,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
 
         {/* Offline message when not logged in */}
         {!user && (
-          <Card className="p-4 text-center border-2">
+          <Card className="p-4 text-center border-2 cursor-pointer hover:bg-accent/50 transition-colors" onClick={onOpenAuth}>
             <div className="text-sm text-muted-foreground">
               Offline mód - adatok csak ezen az eszközön
             </div>

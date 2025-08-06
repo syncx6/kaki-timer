@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Trophy, Clock, DollarSign, Calendar, Trash2, Upload, Download, User } from 'lucide-react';
+import { X, Trophy, Clock, DollarSign, Calendar, Trash2, Upload, Download, User, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -31,6 +31,70 @@ interface LeaderboardEntry {
   session_count: number;
   max_duration: number;
   max_earned: number;
+}
+
+interface ConfirmDeleteButtonProps {
+  onConfirm: () => void;
+}
+
+function ConfirmDeleteButton({ onConfirm }: ConfirmDeleteButtonProps) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleConfirm = () => {
+    onConfirm();
+    setShowConfirm(false);
+  };
+
+  return (
+    <>
+      <Button
+        onClick={() => setShowConfirm(true)}
+        variant="destructive"
+        size="sm"
+        className="w-full"
+      >
+        <Trash2 className="w-4 h-4 mr-2" />
+        Összes adat törlése
+      </Button>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+              Biztosan törlöd?
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-4">
+            <div className="text-center text-muted-foreground">
+              Minden adatot törlünk!<br />
+              Ez nem vonható vissza.
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                onClick={() => setShowConfirm(false)}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                Mégsem
+              </Button>
+              <Button
+                onClick={handleConfirm}
+                variant="destructive"
+                size="lg"
+                className="w-full"
+              >
+                Törlés
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function OnlineLeaderboardContent() {
@@ -359,21 +423,31 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg mx-auto max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
-            📊 Statisztikák
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-full h-full max-w-none max-h-none m-0 p-0 overflow-y-auto bg-background"
+        style={{
+          width: '100vw',
+          height: '100vh',
+          maxWidth: 'none',
+          maxHeight: 'none',
+          margin: 0,
+          borderRadius: 0
+        }}>
+        <div className="p-4">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
+              📊 Statisztikák
+            </DialogTitle>
+          </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue="overview" className="w-full h-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Áttekintés</TabsTrigger>
             <TabsTrigger value="leaderboard">Saját Best Of</TabsTrigger>
             <TabsTrigger value="online">Online</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="overview" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4 min-h-screen">
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4 text-center border-2">
                 <div className="text-2xl">🏆</div>
@@ -409,7 +483,7 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
             </div>
 
             <Card className="p-4 border-2">
-              <div className="space-y-2">
+              <div className="space-y-2 cursor-pointer hover:bg-accent/50 transition-colors p-2 rounded-md">
                 <h3 className="font-semibold text-center">📈 További adatok</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -424,32 +498,13 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
               </div>
             </Card>
 
-            {user && sessions.length > 0 && (
-              <Button
-                onClick={migrateToOnline}
-                variant="fun"
-                size="sm"
-                className="w-full mb-2"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Offline adatok átvitele online
-              </Button>
-            )}
             
             {sessions.length > 0 && (
-              <Button
-                onClick={clearAllData}
-                variant="destructive"
-                size="sm"
-                className="w-full"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Összes adat törlése
-              </Button>
+              <ConfirmDeleteButton onConfirm={clearAllData} />
             )}
           </TabsContent>
 
-          <TabsContent value="leaderboard" className="space-y-4">
+          <TabsContent value="leaderboard" className="space-y-4 min-h-screen">
             <div className="text-center">
               <h3 className="text-xl font-bold text-primary mb-4">
                 🏆 Saját Best Of - Top 3
@@ -494,12 +549,12 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
             )}
           </TabsContent>
 
-          <TabsContent value="online" className="space-y-4">
+          <TabsContent value="online" className="space-y-4 min-h-screen">
             <OnlineLeaderboardContent />
           </TabsContent>
         </Tabs>
-
-        <div className="pt-4">
+        
+        <div className="p-4">
           <Button onClick={onClose} variant="outline" size="lg" className="w-full">
             <X className="w-5 h-5 mr-2" />
             Bezárás
