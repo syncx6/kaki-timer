@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, Settings, BarChart3 } from 'lucide-react';
+import { Play, Square, Settings, BarChart3, Globe, LogOut, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface TimerSession {
   id: string;
@@ -16,11 +18,16 @@ interface TimerSession {
 interface TimerProps {
   onOpenSettings: () => void;
   onOpenStats: () => void;
+  onOpenAuth: () => void;
+  onOpenOnlineLeaderboard: () => void;
+  onLogout: () => void;
   salary: number;
   workHours: number;
+  user: SupabaseUser | null;
+  username: string;
 }
 
-export function Timer({ onOpenSettings, onOpenStats, salary, workHours }: TimerProps) {
+export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLeaderboard, onLogout, salary, workHours, user, username }: TimerProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [sessions, setSessions] = useState<TimerSession[]>([]);
@@ -103,7 +110,7 @@ export function Timer({ onOpenSettings, onOpenStats, salary, workHours }: TimerP
     });
   };
 
-  const handleStopTimer = () => {
+  const handleStopTimer = async () => {
     if (seconds > 0) {
       const session: TimerSession = {
         id: Date.now().toString(),
@@ -113,8 +120,26 @@ export function Timer({ onOpenSettings, onOpenStats, salary, workHours }: TimerP
         earnedMoney: currentEarnings,
       };
       
+      // Save to localStorage (offline)
       const newSessions = [session, ...sessions];
       saveSessions(newSessions);
+      
+      // Save to database if user is logged in
+      if (user) {
+        try {
+          await supabase.from('timer_sessions').insert({
+            user_id: user.id,
+            start_time: session.startTime.toISOString(),
+            end_time: session.endTime.toISOString(),
+            duration: session.duration,
+            earned_money: session.earnedMoney,
+            salary: salary,
+            work_hours: workHours,
+          });
+        } catch (error) {
+          console.error('Error saving session to database:', error);
+        }
+      }
       
       toast({
         title: "✅ Idő mentve!",
@@ -243,6 +268,41 @@ export function Timer({ onOpenSettings, onOpenStats, salary, workHours }: TimerP
           </Card>
         </div>
 
+        {/* User Status */}
+        {user ? (
+          <Card className="p-4 text-center border-2 bg-success/10">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <User className="w-5 h-5 text-success" />
+              <span className="font-bold text-success">Online mód aktív</span>
+            </div>
+            <div className="text-sm font-semibold">@{username}</div>
+            <Button
+              onClick={onLogout}
+              variant="outline"
+              size="sm"
+              className="mt-2"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Kijelentkezés
+            </Button>
+          </Card>
+        ) : (
+          <Card className="p-4 text-center border-2">
+            <div className="text-sm text-muted-foreground mb-2">
+              Offline mód - adatok csak ezen az eszközön
+            </div>
+            <Button
+              onClick={onOpenAuth}
+              variant="fun"
+              size="lg"
+              className="w-full"
+            >
+              <Globe className="w-5 h-5 mr-2" />
+              Go Online! 🌐
+            </Button>
+          </Card>
+        )}
+
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-4">
           <Button
@@ -265,6 +325,21 @@ export function Timer({ onOpenSettings, onOpenStats, salary, workHours }: TimerP
             Statisztikák
           </Button>
         </div>
+
+        {/* Online Features */}
+        {user && (
+          <div className="space-y-4">
+            <Button
+              onClick={onOpenOnlineLeaderboard}
+              variant="fun"
+              size="lg"
+              className="w-full"
+            >
+              <Globe className="w-5 h-5 mr-2" />
+              🏆 Online Toplista
+            </Button>
+          </div>
+        )}
 
         {/* Progress Check Dialog */}
         <Dialog open={showProgressCheck} onOpenChange={setShowProgressCheck}>

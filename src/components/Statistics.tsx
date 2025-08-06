@@ -3,8 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Trophy, Clock, DollarSign, Calendar, Trash2 } from 'lucide-react';
+import { X, Trophy, Clock, DollarSign, Calendar, Trash2, Upload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 interface TimerSession {
   id: string;
@@ -17,9 +19,10 @@ interface TimerSession {
 interface StatisticsProps {
   open: boolean;
   onClose: () => void;
+  user: User | null;
 }
 
-export function Statistics({ open, onClose }: StatisticsProps) {
+export function Statistics({ open, onClose, user }: StatisticsProps) {
   const [sessions, setSessions] = useState<TimerSession[]>([]);
   const { toast } = useToast();
 
@@ -96,13 +99,59 @@ export function Statistics({ open, onClose }: StatisticsProps) {
       .slice(0, 10);
   };
 
-  const clearAllData = () => {
+  const clearAllData = async () => {
     localStorage.removeItem('wc-timer-sessions');
     setSessions([]);
+    
+    // Clear online data too if user is logged in
+    if (user) {
+      try {
+        await supabase
+          .from('timer_sessions')
+          .delete()
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Error clearing online data:', error);
+      }
+    }
+    
     toast({
       title: "🗑️ Adatok törölve",
       description: "Minden eddigi időmérés törölve lett!",
     });
+  };
+
+  const migrateToOnline = async () => {
+    if (!user || sessions.length === 0) return;
+
+    try {
+      const sessionsToMigrate = sessions.map(session => ({
+        user_id: user.id,
+        start_time: session.startTime.toISOString(),
+        end_time: session.endTime.toISOString(),
+        duration: session.duration,
+        earned_money: session.earnedMoney,
+        salary: 550000, // Default values since we don't have them in localStorage
+        work_hours: 180,
+      }));
+
+      const { error } = await supabase
+        .from('timer_sessions')
+        .insert(sessionsToMigrate);
+
+      if (error) throw error;
+
+      toast({
+        title: "📤 Sikeres átvitel!",
+        description: `${sessions.length} mérés átkerült online fiókodba!`,
+      });
+    } catch (error) {
+      console.error('Error migrating sessions:', error);
+      toast({
+        title: "❌ Átviteli hiba",
+        description: "Nem sikerült az adatok átvitele!",
+      });
+    }
   };
 
   const stats = getStats();
@@ -174,6 +223,18 @@ export function Statistics({ open, onClose }: StatisticsProps) {
               </div>
             </Card>
 
+            {user && sessions.length > 0 && (
+              <Button
+                onClick={migrateToOnline}
+                variant="fun"
+                size="sm"
+                className="w-full mb-2"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Offline adatok átvitele online
+              </Button>
+            )}
+            
             {sessions.length > 0 && (
               <Button
                 onClick={clearAllData}

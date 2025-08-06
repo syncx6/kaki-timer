@@ -54,6 +54,7 @@ export type Database = {
           id: string
           updated_at: string
           user_id: string
+          username: string | null
         }
         Insert: {
           created_at?: string
@@ -61,6 +62,7 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id: string
+          username?: string | null
         }
         Update: {
           created_at?: string
@@ -68,6 +70,43 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      timer_sessions: {
+        Row: {
+          created_at: string
+          duration: number
+          earned_money: number
+          end_time: string
+          id: string
+          salary: number
+          start_time: string
+          user_id: string
+          work_hours: number
+        }
+        Insert: {
+          created_at?: string
+          duration: number
+          earned_money: number
+          end_time: string
+          id?: string
+          salary: number
+          start_time: string
+          user_id: string
+          work_hours: number
+        }
+        Update: {
+          created_at?: string
+          duration?: number
+          earned_money?: number
+          end_time?: string
+          id?: string
+          salary?: number
+          start_time?: string
+          user_id?: string
+          work_hours?: number
         }
         Relationships: []
       }
