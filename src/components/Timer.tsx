@@ -292,38 +292,32 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
           </Card>
         </div>
 
-        {/* User Status */}
-        {user ? (
-          <Card className="p-4 text-center border-2 bg-success/10">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <User className="w-5 h-5 text-success" />
-              <span className="font-bold text-success">Online mód aktív</span>
+        {/* User Status - Small display at top when logged in */}
+        {user && (
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center gap-2 text-sm bg-success/10 px-3 py-1 rounded-full border">
+              <User className="w-4 h-4 text-success" />
+              <span className="text-success font-medium">Online mód aktív</span>
+              <span className="font-semibold">{username}</span>
             </div>
-            <div className="text-sm font-semibold">@{username}</div>
             <Button
               onClick={onLogout}
               variant="outline"
               size="sm"
-              className="mt-2"
+              className="mt-2 ml-2"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Kijelentkezés
             </Button>
-          </Card>
-        ) : (
+          </div>
+        )}
+
+        {/* Offline message when not logged in */}
+        {!user && (
           <Card className="p-4 text-center border-2">
-            <div className="text-sm text-muted-foreground mb-2">
+            <div className="text-sm text-muted-foreground">
               Offline mód - adatok csak ezen az eszközön
             </div>
-            <Button
-              onClick={onOpenAuth}
-              variant="fun"
-              size="lg"
-              className="w-full"
-            >
-              <Globe className="w-5 h-5 mr-2" />
-              Go Online! 🌐
-            </Button>
           </Card>
         )}
 

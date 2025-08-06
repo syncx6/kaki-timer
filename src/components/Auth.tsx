@@ -56,8 +56,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         return;
       }
 
-      // Use username as email if no email provided
-      const email = formData.email || `${formData.username}@wctimer.local`;
+      // Use username as email if no email provided - use a proper domain
+      const email = formData.email || `${formData.username}@example.com`;
       
       const { data, error } = await supabase.auth.signUp({
         email: email,
@@ -122,7 +122,7 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
           .single();
         
         if (profile) {
-          email = `${formData.username}@wctimer.local`;
+          email = `${formData.username}@example.com`;
         } else {
           throw new Error('Felhasználó nem található!');
         }
