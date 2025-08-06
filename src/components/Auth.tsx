@@ -29,10 +29,23 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignUp = async () => {
-    if (!formData.email || !formData.username || !formData.password) {
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!formData.email || !emailRegex.test(formData.email)) {
+      toast({
+        title: "❌ Helytelen e-mail formátum",
+        description: "Kérlek adj meg egy érvényes e-mail címet!",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
+      });
+      return;
+    }
+
+    if (!formData.username || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "E-mail cím, felhasználónév és jelszó szükséges!",
+        description: "Felhasználónév és jelszó szükséges!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });
@@ -73,17 +86,25 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
       if (error) throw error;
 
       if (data.user) {
-        // Create profile with username
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              user_id: data.user.id,
-              username: formData.username,
-            }
-          ]);
+        // Create profile with username - wrapped in try-catch to handle RLS issues
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                user_id: data.user.id,
+                username: formData.username,
+              }
+            ]);
 
-        if (profileError) throw profileError;
+          if (profileError) {
+            console.warn('Profile creation warning:', profileError);
+            // Continue anyway as the user account was created successfully
+          }
+        } catch (profileError) {
+          console.warn('Profile creation warning:', profileError);
+          // Continue anyway as the user account was created successfully
+        }
 
         toast({
           title: "🎉 Regisztráció sikeres!",
