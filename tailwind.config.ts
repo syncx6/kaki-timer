@@ -36,6 +36,14 @@ export default {
 					DEFAULT: 'hsl(var(--destructive))',
 					foreground: 'hsl(var(--destructive-foreground))'
 				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',
 					foreground: 'hsl(var(--muted-foreground))'
@@ -68,6 +76,13 @@ export default {
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
 			},
+			backgroundImage: {
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-fun': 'var(--gradient-fun)'
+			},
+			boxShadow: {
+				'fun': 'var(--shadow-fun)'
+			},
 			keyframes: {
 				'accordion-down': {
 					from: {
@@ -84,11 +99,37 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'bounce-in': {
+					'0%': {
+						transform: 'scale(0.3)',
+						opacity: '0'
+					},
+					'50%': {
+						transform: 'scale(1.05)'
+					},
+					'70%': {
+						transform: 'scale(0.9)'
+					},
+					'100%': {
+						transform: 'scale(1)',
+						opacity: '1'
+					}
+				},
+				'wiggle': {
+					'0%, 100%': {
+						transform: 'rotate(-3deg)'
+					},
+					'50%': {
+						transform: 'rotate(3deg)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'bounce-in': 'bounce-in 0.6s ease-out',
+				'wiggle': 'wiggle 1s ease-in-out infinite'
 			}
 		}
 	},
