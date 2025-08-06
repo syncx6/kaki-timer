@@ -15,6 +15,7 @@ interface TimerSession {
   duration: number; // in seconds
   earnedMoney: number;
   kaki_earned?: number;
+  username?: string;
 }
 
 interface TimerProps {
@@ -163,7 +164,13 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
   };
 
   const handleStopTimer = async () => {
-    const finalSeconds = seconds; // Store the final time before resetting
+    // Store the final time before resetting
+    const finalSeconds = seconds;
+    
+    // First, stop the timer and reset immediately
+    setIsRunning(false);
+    setSeconds(0);
+    setLastProgressCheck(null);
     if (finalSeconds > 0) {
       // Calculate kaki badges earned (1 per 10 minutes, max 5)
       const minutesElapsed = Math.floor(finalSeconds / 60);
@@ -176,6 +183,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
         duration: finalSeconds,
         earnedMoney: (finalSeconds / 3600) * hourlyRate,
         kaki_earned: kakiEarned,
+        username: username,
       };
       
       // Save to localStorage (offline)
@@ -228,10 +236,6 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
         duration: 1000,
       });
     }
-    
-    setIsRunning(false);
-    setSeconds(0); // Reset to 0:00 after stopping
-    setLastProgressCheck(null);
   };
 
   const handleProgressResponse = (continuing: boolean) => {
