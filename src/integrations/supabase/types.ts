@@ -121,7 +121,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_kaki_count: {
+        Args: { user_id: string; count: number }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -147,11 +147,18 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
           if (error) {
             console.error('Error saving to Supabase:', error);
           } else {
-            // Update user's kaki count
-            await supabase.rpc('increment_kaki_count', { 
-              user_id: user.id, 
-              count: kakiEarned 
-            });
+            // Get current kaki count and update it
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('kaki_count')
+              .eq('user_id', user.id)
+              .single();
+            
+            const currentKakiCount = profile?.kaki_count || 0;
+            await supabase
+              .from('profiles')
+              .update({ kaki_count: currentKakiCount + kakiEarned })
+              .eq('user_id', user.id);
           }
         } catch (error) {
           console.error('Error saving session to database:', error);

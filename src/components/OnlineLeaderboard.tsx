@@ -31,23 +31,25 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('timer_sessions')
-        .select(`
-          user_id, 
-          duration, 
-          earned_money,
-          profiles!inner(username, kaki_count)
-        `)
-        .order('created_at', { ascending: false });
+        .select('user_id, duration, earned_money');
 
       if (error) throw error;
 
+      // Get profiles separately
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, username, kaki_count');
+
+      if (profileError) throw profileError;
+
       // Group by user and calculate totals
-      const userStats = data.reduce((acc: Record<string, LeaderboardEntry>, session) => {
+      const userStats = data?.reduce((acc: Record<string, LeaderboardEntry>, session) => {
         if (!acc[session.user_id]) {
+          const profile = profiles?.find(p => p.user_id === session.user_id);
           acc[session.user_id] = {
             user_id: session.user_id,
-            username: session.profiles?.username || '',
-            kaki_count: session.profiles?.kaki_count || 0,
+            username: profile?.username || '',
+            kaki_count: profile?.kaki_count || 0,
             total_duration: 0,
             total_earned: 0,
             session_count: 0,
@@ -63,7 +65,7 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
         acc[session.user_id].max_earned = Math.max(acc[session.user_id].max_earned, session.earned_money);
         
         return acc;
-      }, {});
+      }, {}) || {};
 
       // Convert to array and sort by total duration
       const sortedStats = Object.values(userStats).sort((a, b) => b.total_duration - a.total_duration);
