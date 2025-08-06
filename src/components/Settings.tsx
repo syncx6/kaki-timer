@@ -56,7 +56,7 @@ export function Settings({ open, onClose, salary, workHours, onSave, onOpenAuth,
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto">
+      <DialogContent className="max-w-md mx-auto p-4">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             ⚙️ Beállítások

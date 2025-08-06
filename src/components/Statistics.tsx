@@ -355,7 +355,7 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
   };
 
   const stats = getStats();
-  const topSessions = getTopSessions();
+  const topSessions = getTopSessions().slice(0, 3);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -369,8 +369,8 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Áttekintés</TabsTrigger>
-            <TabsTrigger value="leaderboard">Offline Top</TabsTrigger>
-            <TabsTrigger value="online">Online Top</TabsTrigger>
+            <TabsTrigger value="leaderboard">Saját Best Of</TabsTrigger>
+            <TabsTrigger value="online">Online</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview" className="space-y-4">
@@ -452,7 +452,7 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
           <TabsContent value="leaderboard" className="space-y-4">
             <div className="text-center">
               <h3 className="text-xl font-bold text-primary mb-4">
-                🏆 Offline Legjobb Idők
+                🏆 Saját Best Of - Top 3
               </h3>
             </div>
 

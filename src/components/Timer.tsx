@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, Settings, BarChart3, Globe, LogOut, User } from 'lucide-react';
+import { Play, Square, Settings, BarChart3, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { UserStatusDropdown } from './UserStatusDropdown';
 
 interface TimerSession {
   id: string;
@@ -269,25 +270,13 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-primary/10 p-4">
-      {/* User Status - Top Right when logged in */}
-      {user && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="flex items-center gap-2 bg-success/10 px-3 py-2 rounded-full border backdrop-blur-sm">
-            <User className="w-4 h-4 text-success" />
-            <span className="text-success font-medium text-sm">Online</span>
-            <span className="font-semibold text-sm">{username}</span>
-            <span className="text-lg">💩{kakiCount}</span>
-            <Button
-              onClick={onLogout}
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 ml-1"
-            >
-              <LogOut className="w-3 h-3" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <UserStatusDropdown 
+        username={username}
+        kakiCount={kakiCount}
+        onLogout={onLogout}
+        onOpenStats={onOpenStats}
+        user={user}
+      />
 
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
