@@ -139,10 +139,12 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
     const timeout = setTimeout(() => {
       handleStopTimer();
       setShowProgressCheck(false);
-      toast({
-        title: "⏰ Idő lejárt!",
-        description: "15 másodperc után automatikusan leállt a timer.",
-      });
+        toast({
+          title: "⏰ Idő lejárt!",
+          description: "15 másodperc után automatikusan leállt a timer.",
+          className: "fixed bottom-4 right-4 z-50",
+          duration: 1000,
+        });
     }, 15000);
 
     return () => clearTimeout(timeout);
@@ -152,10 +154,12 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
     setIsRunning(true);
     setSeconds(0);
     setLastProgressCheck(new Date());
-    toast({
-      title: "🚽 Timer elindítva!",
-      description: "Jó szórakozást! 💩",
-    });
+      toast({
+        title: "🚽 Timer elindítva!",
+        description: "Jó szórakozást! 💩",
+        className: "fixed bottom-4 right-4 z-50",
+        duration: 1000,
+      });
   };
 
   const handleStopTimer = async () => {
@@ -226,7 +230,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
     }
     
     setIsRunning(false);
-    setSeconds(finalSeconds); // Keep the final time displayed
+    setSeconds(0); // Reset to 0:00 after stopping
     setLastProgressCheck(null);
   };
 
@@ -236,10 +240,12 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
       handleStopTimer();
     } else {
       setLastProgressCheck(new Date());
-      toast({
-        title: "💪 Folytatjuk!",
-        description: "Hajrá, még vagy benne! 🔥",
-      });
+        toast({
+          title: "💪 Folytatjuk!",
+          description: "Hajrá, még vagy benne! 🔥",
+          className: "fixed bottom-4 right-4 z-50",
+          duration: 1000,
+        });
     }
   };
 
@@ -300,10 +306,8 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
             </div>
             
             {isRunning && (
-              <div className="space-y-2 animate-bounce-in">
-                <div className="text-2xl font-bold text-success">
-                  +{formatMoney(currentEarnings)} Ft
-                </div>
+              <div className="text-2xl font-bold text-success animate-bounce-in">
+                +{formatMoney(currentEarnings)} Ft
               </div>
             )}
           </div>

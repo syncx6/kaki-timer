@@ -18,6 +18,7 @@ interface AuthProps {
 export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
+    email: '',
     username: '',
     password: '',
   });
@@ -28,10 +29,10 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignUp = async () => {
-    if (!formData.username || !formData.password) {
+    if (!formData.email || !formData.username || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Felhasználónév és jelszó szükséges!",
+        description: "E-mail cím, felhasználónév és jelszó szükséges!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });
@@ -45,7 +46,7 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         .from('profiles')
         .select('username')
         .eq('username', formData.username)
-        .single();
+        .maybeSingle();
 
       if (existingProfile) {
         toast({
@@ -58,11 +59,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         return;
       }
 
-      // Create user with simple username as email
-      const email = `${formData.username}@internal.app`;
-      
       const { data, error } = await supabase.auth.signUp({
-        email: email,
+        email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
@@ -108,10 +106,10 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignIn = async () => {
-    if (!formData.username || !formData.password) {
+    if (!formData.email || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Felhasználónév és jelszó szükséges!",
+        description: "E-mail cím és jelszó szükséges!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });
@@ -120,11 +118,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
 
     setIsLoading(true);
     try {
-      // Use username as email
-      const email = `${formData.username}@internal.app`;
-      
       const { error } = await supabase.auth.signInWithPassword({
-        email: email,
+        email: formData.email,
         password: formData.password,
       });
 
@@ -140,7 +135,7 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
     } catch (error: any) {
       toast({
         title: "❌ Bejelentkezés sikertelen",
-        description: "Helytelen felhasználónév vagy jelszó!",
+        description: "Helytelen e-mail cím vagy jelszó!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });
@@ -178,12 +173,13 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
           <TabsContent value="signin" className="space-y-4">
             <Card className="p-6 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-username">Felhasználónév</Label>
+                <Label htmlFor="signin-email">E-mail cím</Label>
                 <Input
-                  id="signin-username"
-                  placeholder="kakikiraly"
-                  value={formData.username}
-                  onChange={(e) => handleInputChange('username', e.target.value)}
+                  id="signin-email"
+                  type="email"
+                  placeholder="kaki@example.com"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   onKeyPress={handleKeyPress}
                   disabled={isLoading}
                 />
@@ -216,6 +212,19 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
 
           <TabsContent value="signup" className="space-y-4">
             <Card className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="signup-email">E-mail cím</Label>
+                <Input
+                  id="signup-email"
+                  type="email"
+                  placeholder="kaki@example.com"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={isLoading}
+                />
+              </div>
+              
               <div className="space-y-2">
                 <Label htmlFor="signup-username">Felhasználónév</Label>
                 <Input
