@@ -299,7 +299,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
         </div>
 
         {/* Timer Display */}
-        <Card className="p-8 text-center shadow-fun border-2">
+        <Card className="p-8 text-center shadow-fun border-2 min-h-[200px] flex items-center justify-center">
           <div className="space-y-4">
             <div className={`text-6xl font-black font-mono ${isRunning ? 'text-success animate-pulse' : 'text-primary'}`}>
               {formatTime(seconds)}

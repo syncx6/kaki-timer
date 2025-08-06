@@ -7,6 +7,8 @@ import { X, Trophy, Clock, DollarSign, Calendar, Trash2, Upload, Download, User,
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 interface TimerSession {
   id: string;
@@ -288,6 +290,7 @@ function OnlineLeaderboardContent() {
 
 export function Statistics({ open, onClose, user }: StatisticsProps) {
   const [sessions, setSessions] = useState<TimerSession[]>([]);
+  const [showDetailedCharts, setShowDetailedCharts] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -418,6 +421,63 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
     }
   };
 
+  const getWeeklyData = () => {
+    const today = new Date();
+    const weekData = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - i));
+      const dayName = date.toLocaleDateString('hu-HU', { weekday: 'short' });
+      
+      const daySessions = sessions.filter(session => {
+        const sessionDate = new Date(session.startTime);
+        return sessionDate.toDateString() === date.toDateString();
+      });
+      
+      return {
+        day: dayName,
+        sessions: daySessions.length,
+        totalTime: Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60)
+      };
+    });
+    return weekData;
+  };
+
+  const getMonthlyData = () => {
+    const weeks = [];
+    const today = new Date();
+    
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - (i * 7) - 6);
+      const weekEnd = new Date(today);
+      weekEnd.setDate(today.getDate() - (i * 7));
+      
+      const weekSessions = sessions.filter(session => {
+        const sessionDate = new Date(session.startTime);
+        return sessionDate >= weekStart && sessionDate <= weekEnd;
+      });
+      
+      weeks.push({
+        week: `${i === 0 ? 'Ez' : i + 1}. hét`,
+        totalEarnings: Math.round(weekSessions.reduce((sum, s) => sum + s.earnedMoney, 0)),
+        totalTime: Math.round(weekSessions.reduce((sum, s) => sum + s.duration, 0) / 60)
+      });
+    }
+    return weeks;
+  };
+
+  const getSessionDistribution = () => {
+    const short = sessions.filter(s => s.duration < 300).length; // < 5 min
+    const medium = sessions.filter(s => s.duration >= 300 && s.duration <= 900).length; // 5-15 min
+    const long = sessions.filter(s => s.duration > 900).length; // > 15 min
+    
+    return [
+      { name: 'Rövid', count: short, key: 'short' },
+      { name: 'Közepes', count: medium, key: 'medium' },
+      { name: 'Hosszú', count: long, key: 'long' }
+    ];
+  };
+
   const stats = getStats();
   const topSessions = getTopSessions().slice(0, 3);
 
@@ -483,8 +543,11 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
             </div>
 
             <Card className="p-4 border-2">
-              <div className="space-y-2 cursor-pointer hover:bg-accent/50 transition-colors p-2 rounded-md">
-                <h3 className="font-semibold text-center">📈 További adatok</h3>
+              <button 
+                className="w-full space-y-2 cursor-pointer hover:bg-accent/50 transition-colors p-2 rounded-md"
+                onClick={() => setShowDetailedCharts(!showDetailedCharts)}
+              >
+                <h3 className="font-semibold text-center">📈 További adatok {showDetailedCharts ? '▼' : '▶'}</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Átlag idő:</span>
@@ -495,8 +558,114 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
                     <div className="font-semibold">{stats.totalSessions} db</div>
                   </div>
                 </div>
-              </div>
+              </button>
             </Card>
+
+            {showDetailedCharts && sessions.length > 0 && (
+              <div className="space-y-6">
+                {/* Heti teljesítmény grafikon */}
+                <Card className="p-4 border-2">
+                  <h4 className="font-semibold text-center mb-4">📊 Heti teljesítmény</h4>
+                  <ChartContainer
+                    config={{
+                      sessions: {
+                        label: "Alkalmak",
+                        color: "hsl(var(--primary))",
+                      },
+                      time: {
+                        label: "Idő (perc)",
+                        color: "hsl(var(--success))",
+                      },
+                    }}
+                    className="h-[200px]"
+                  >
+                    <BarChart data={getWeeklyData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="day" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="sessions" fill="var(--color-sessions)" />
+                    </BarChart>
+                  </ChartContainer>
+                </Card>
+
+                {/* Havi trend grafikon */}
+                <Card className="p-4 border-2">
+                  <h4 className="font-semibold text-center mb-4">📈 Havi trend</h4>
+                  <ChartContainer
+                    config={{
+                      earnings: {
+                        label: "Kereset (Ft)",
+                        color: "hsl(var(--warning))",
+                      },
+                      time: {
+                        label: "Idő (perc)",
+                        color: "hsl(var(--success))",
+                      },
+                    }}
+                    className="h-[200px]"
+                  >
+                    <LineChart data={getMonthlyData()}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="week" />
+                      <YAxis />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="totalEarnings" 
+                        stroke="var(--color-earnings)" 
+                        strokeWidth={3}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="totalTime" 
+                        stroke="var(--color-time)" 
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </Card>
+
+                {/* Teljesítmény kördiagram */}
+                <Card className="p-4 border-2">
+                  <h4 className="font-semibold text-center mb-4">🎯 Időszakok megoszlása</h4>
+                  <ChartContainer
+                    config={{
+                      short: {
+                        label: "Rövid (< 5 perc)",
+                        color: "hsl(var(--destructive))",
+                      },
+                      medium: {
+                        label: "Közepes (5-15 perc)",
+                        color: "hsl(var(--warning))",
+                      },
+                      long: {
+                        label: "Hosszú (> 15 perc)",
+                        color: "hsl(var(--success))",
+                      },
+                    }}
+                    className="h-[250px]"
+                  >
+                    <PieChart>
+                      <Pie
+                        data={getSessionDistribution()}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="count"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {getSessionDistribution().map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={`var(--color-${entry.key})`} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ChartContainer>
+                </Card>
+              </div>
+            )}
 
             
             {sessions.length > 0 && (
