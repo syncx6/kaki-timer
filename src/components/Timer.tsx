@@ -13,6 +13,7 @@ interface TimerSession {
   endTime: Date;
   duration: number; // in seconds
   earnedMoney: number;
+  kaki_earned?: number;
 }
 
 interface TimerProps {
@@ -112,12 +113,17 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
 
   const handleStopTimer = async () => {
     if (seconds > 0) {
+      // Calculate kaki badges earned (1 per 10 minutes, max 5)
+      const minutesElapsed = Math.floor(seconds / 60);
+      const kakiEarned = Math.min(Math.floor(minutesElapsed / 10) + 1, 5);
+
       const session: TimerSession = {
         id: Date.now().toString(),
         startTime: new Date(Date.now() - seconds * 1000),
         endTime: new Date(),
         duration: seconds,
         earnedMoney: currentEarnings,
+        kaki_earned: kakiEarned,
       };
       
       // Save to localStorage (offline)
@@ -127,7 +133,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
       // Save to database if user is logged in
       if (user) {
         try {
-          await supabase.from('timer_sessions').insert({
+          const { error } = await supabase.from('timer_sessions').insert({
             user_id: user.id,
             start_time: session.startTime.toISOString(),
             end_time: session.endTime.toISOString(),
@@ -135,7 +141,18 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
             earned_money: session.earnedMoney,
             salary: salary,
             work_hours: workHours,
+            kaki_earned: kakiEarned,
           });
+
+          if (error) {
+            console.error('Error saving to Supabase:', error);
+          } else {
+            // Update user's kaki count
+            await supabase.rpc('increment_kaki_count', { 
+              user_id: user.id, 
+              count: kakiEarned 
+            });
+          }
         } catch (error) {
           console.error('Error saving session to database:', error);
         }
@@ -143,7 +160,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
       
       toast({
         title: "✅ Idő mentve!",
-        description: `${formatTime(seconds)} alatt ${formatMoney(currentEarnings)} Ft-ot kerestél!`,
+        description: `${formatTime(seconds)} alatt ${formatMoney(currentEarnings)} Ft-ot kerestél és ${kakiEarned} 💩 jelvényt szereztél!`,
       });
     }
     

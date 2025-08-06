@@ -30,10 +30,10 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignUp = async () => {
-    if (!formData.username || !formData.email || !formData.password) {
+    if (!formData.username || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Minden mezőt ki kell tölteni!",
+        description: "Felhasználónév és jelszó szükséges!",
       });
       return;
     }
@@ -56,8 +56,11 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         return;
       }
 
+      // Use username as email if no email provided
+      const email = formData.email || `${formData.username}@wctimer.local`;
+      
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
+        email: email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
@@ -99,18 +102,34 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignIn = async () => {
-    if (!formData.email || !formData.password) {
+    if ((!formData.username && !formData.email) || !formData.password) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Email és jelszó szükséges!",
+        description: "Felhasználónév/email és jelszó szükséges!",
       });
       return;
     }
 
     setIsLoading(true);
     try {
+      // Try to find user by username if no email provided
+      let email = formData.email;
+      if (!email && formData.username) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('username', formData.username)
+          .single();
+        
+        if (profile) {
+          email = `${formData.username}@wctimer.local`;
+        } else {
+          throw new Error('Felhasználó nem található!');
+        }
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: email || formData.email,
         password: formData.password,
       });
 
@@ -149,13 +168,12 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
           <TabsContent value="signin" className="space-y-4">
             <Card className="p-6 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-email">Email cím</Label>
+                <Label htmlFor="signin-username">Felhasználónév</Label>
                 <Input
-                  id="signin-email"
-                  type="email"
-                  placeholder="pelda@email.com"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  id="signin-username"
+                  placeholder="kakikiraly"
+                  value={formData.username}
+                  onChange={(e) => handleInputChange('username', e.target.value)}
                   disabled={isLoading}
                 />
               </div>
@@ -209,11 +227,11 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="signup-email">Email cím</Label>
+                <Label htmlFor="signup-email">Email cím (opcionális)</Label>
                 <Input
                   id="signup-email"
                   type="email"
-                  placeholder="pelda@email.com"
+                  placeholder="pelda@email.com (nem kötelező)"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   disabled={isLoading}

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Save, X } from 'lucide-react';
+import { Save, X, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface SettingsProps {
@@ -13,9 +13,11 @@ interface SettingsProps {
   salary: number;
   workHours: number;
   onSave: (salary: number, workHours: number) => void;
+  onOpenAuth: () => void;
+  isOnline: boolean;
 }
 
-export function Settings({ open, onClose, salary, workHours, onSave }: SettingsProps) {
+export function Settings({ open, onClose, salary, workHours, onSave, onOpenAuth, isOnline }: SettingsProps) {
   const [newSalary, setNewSalary] = useState(salary.toString());
   const [newWorkHours, setNewWorkHours] = useState(workHours.toString());
   const { toast } = useToast();
@@ -104,6 +106,23 @@ export function Settings({ open, onClose, salary, workHours, onSave }: SettingsP
               )}
             </div>
           </Card>
+
+          {!isOnline && (
+            <Card className="p-4 border-2 border-primary/20">
+              <Button
+                onClick={onOpenAuth}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              >
+                <Globe className="w-5 h-5 mr-2" />
+                🌐 Online Mód
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Csatlakozz az online közösséghez!
+              </p>
+            </Card>
+          )}
 
           <div className="flex gap-4">
             <Button

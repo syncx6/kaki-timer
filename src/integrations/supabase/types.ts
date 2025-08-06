@@ -52,6 +52,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          kaki_count: number | null
           updated_at: string
           user_id: string
           username: string | null
@@ -60,6 +61,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          kaki_count?: number | null
           updated_at?: string
           user_id: string
           username?: string | null
@@ -68,6 +70,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          kaki_count?: number | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -81,6 +84,7 @@ export type Database = {
           earned_money: number
           end_time: string
           id: string
+          kaki_earned: number | null
           salary: number
           start_time: string
           user_id: string
@@ -92,6 +96,7 @@ export type Database = {
           earned_money: number
           end_time: string
           id?: string
+          kaki_earned?: number | null
           salary: number
           start_time: string
           user_id: string
@@ -103,6 +108,7 @@ export type Database = {
           earned_money?: number
           end_time?: string
           id?: string
+          kaki_earned?: number | null
           salary?: number
           start_time?: string
           user_id?: string

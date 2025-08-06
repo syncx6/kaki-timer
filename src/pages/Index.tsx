@@ -105,6 +105,8 @@ const Index = () => {
         salary={salary}
         workHours={workHours}
         onSave={handleSaveSettings}
+        onOpenAuth={() => setShowAuth(true)}
+        isOnline={!!user}
       />
       
       <Statistics
