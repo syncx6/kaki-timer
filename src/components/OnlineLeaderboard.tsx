@@ -48,7 +48,7 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
           const profile = profiles?.find(p => p.user_id === session.user_id);
           acc[session.user_id] = {
             user_id: session.user_id,
-            username: profile?.username || '',
+            username: profile?.username || `User #${session.user_id.slice(0, 8)}`,
             kaki_count: profile?.kaki_count || 0,
             total_duration: 0,
             total_earned: 0,
@@ -127,7 +127,7 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
                   </div>
                   <div>
                     <div className="font-semibold flex items-center gap-2">
-                      {entry.username || `Felhasználó #${entry.user_id.slice(0, 8)}`}
+                      {entry.username}
                       <span className="text-lg">💩{entry.kaki_count || 0}</span>
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -161,10 +161,10 @@ export function OnlineLeaderboard({ open, onClose }: OnlineLeaderboardProps) {
         <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
           <DialogContent className="max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
-                <User className="w-6 h-6" />
-                {selectedUser.username || `Felhasználó #${selectedUser.user_id.slice(0, 8)}`}
-              </DialogTitle>
+                <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
+                  <User className="w-6 h-6" />
+                  {selectedUser.username}
+                </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 pt-4">

@@ -34,13 +34,15 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
   const [sessions, setSessions] = useState<TimerSession[]>([]);
   const [showProgressCheck, setShowProgressCheck] = useState(false);
   const [lastProgressCheck, setLastProgressCheck] = useState<Date | null>(null);
+  const [kakiCount, setKakiCount] = useState(0);
+  const [worker, setWorker] = useState<Worker | null>(null);
   const { toast } = useToast();
 
   // Calculate hourly rate
   const hourlyRate = salary / workHours;
   const currentEarnings = (seconds / 3600) * hourlyRate;
 
-  // Load sessions from localStorage
+  // Load sessions from localStorage and fetch kaki count
   useEffect(() => {
     const saved = localStorage.getItem('wc-timer-sessions');
     if (saved) {
@@ -51,7 +53,25 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
       }));
       setSessions(parsed);
     }
-  }, []);
+
+    // Fetch user's kaki count if logged in
+    if (user) {
+      const fetchKakiCount = async () => {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('kaki_count')
+            .eq('user_id', user.id)
+            .single();
+          
+          setKakiCount(data?.kaki_count || 0);
+        } catch (error) {
+          console.error('Error fetching kaki count:', error);
+        }
+      };
+      fetchKakiCount();
+    }
+  }, [user]);
 
   // Save sessions to localStorage
   const saveSessions = useCallback((newSessions: TimerSession[]) => {
@@ -59,16 +79,42 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
     setSessions(newSessions);
   }, []);
 
-  // Timer effect
+  // Initialize Web Worker for background timing
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    const newWorker = new Worker(new URL('../workers/timer-worker.ts', import.meta.url), {
+      type: 'module'
+    });
+    
+    newWorker.onmessage = (e) => {
+      const { type, elapsed } = e.data;
+      
+      switch (type) {
+        case 'TICK':
+          setSeconds(elapsed);
+          break;
+        case 'STOPPED':
+          setSeconds(elapsed);
+          break;
+      }
+    };
+    
+    setWorker(newWorker);
+    
+    return () => {
+      newWorker.terminate();
+    };
+  }, []);
+
+  // Timer effect using Web Worker
+  useEffect(() => {
+    if (!worker) return;
+    
     if (isRunning) {
-      interval = setInterval(() => {
-        setSeconds((prev) => prev + 1);
-      }, 1000);
+      worker.postMessage({ type: 'START' });
+    } else {
+      worker.postMessage({ type: 'STOP' });
     }
-    return () => clearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, worker]);
 
   // Progress check effect (every 20 minutes)
   useEffect(() => {
@@ -155,10 +201,14 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
               .single();
             
             const currentKakiCount = profile?.kaki_count || 0;
+            const newKakiCount = currentKakiCount + kakiEarned;
             await supabase
               .from('profiles')
-              .update({ kaki_count: currentKakiCount + kakiEarned })
+              .update({ kaki_count: newKakiCount })
               .eq('user_id', user.id);
+            
+            // Update local kaki count
+            setKakiCount(newKakiCount);
           }
         } catch (error) {
           console.error('Error saving session to database:', error);
@@ -219,6 +269,26 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-primary/10 p-4">
+      {/* User Status - Top Right when logged in */}
+      {user && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex items-center gap-2 bg-success/10 px-3 py-2 rounded-full border backdrop-blur-sm">
+            <User className="w-4 h-4 text-success" />
+            <span className="text-success font-medium text-sm">Online</span>
+            <span className="font-semibold text-sm">{username}</span>
+            <span className="text-lg">💩{kakiCount}</span>
+            <Button
+              onClick={onLogout}
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 ml-1"
+            >
+              <LogOut className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-2 pt-8">
@@ -291,26 +361,6 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
             <div className="text-sm text-muted-foreground">Össz kereset 💰</div>
           </Card>
         </div>
-
-        {/* User Status - Small display at top when logged in */}
-        {user && (
-          <div className="text-center mb-4">
-            <div className="inline-flex items-center gap-2 text-sm bg-success/10 px-3 py-1 rounded-full border">
-              <User className="w-4 h-4 text-success" />
-              <span className="text-success font-medium">Online mód aktív</span>
-              <span className="font-semibold">{username}</span>
-            </div>
-            <Button
-              onClick={onLogout}
-              variant="outline"
-              size="sm"
-              className="mt-2 ml-2"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Kijelentkezés
-            </Button>
-          </div>
-        )}
 
         {/* Offline message when not logged in */}
         {!user && (
