@@ -69,8 +69,21 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
 
       if (error) {
         console.error('Error loading challenges:', error);
-        // For now, just set empty array since table doesn't exist
-        setChallenges([]);
+        // If table doesn't exist, create demo challenges
+        const demoChallenges = [
+          {
+            id: 'demo1',
+            challenger_id: user?.id,
+            challenger_username: username,
+            target_id: 'demo_opponent1',
+            target_username: 'KakiKiraly',
+            challenger_score: 0,
+            target_score: 0,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          }
+        ];
+        setChallenges(demoChallenges);
         return;
       }
       
@@ -140,6 +153,11 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
     setGameResult(null); // Reset previous result
     console.log('Game started, isPlaying:', true, 'gameState: playing');
     
+    // Enable touch prevention
+    if (window.setPVPPlaying) {
+      window.setPVPPlaying(true);
+    }
+    
     // Force a re-render to ensure isPlaying is set
     setTimeout(() => {
       console.log('Game state after timeout - isPlaying:', true);
@@ -195,31 +213,78 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
     console.log('Game state changed - isPlaying:', isPlaying, 'clickCount:', clickCount, 'timeLeft:', timeLeft);
   }, [isPlaying, clickCount, timeLeft]);
 
+  // Enable/disable global touch prevention based on game state
+  useEffect(() => {
+    if (open && gameState === 'playing' && isPlaying) {
+      // Enable touch prevention
+      if (window.setPVPPlaying) {
+        window.setPVPPlaying(true);
+      }
+    } else {
+      // Disable touch prevention
+      if (window.setPVPPlaying) {
+        window.setPVPPlaying(false);
+      }
+    }
+
+    return () => {
+      // Always disable touch prevention when component unmounts
+      if (window.setPVPPlaying) {
+        window.setPVPPlaying(false);
+      }
+    };
+  }, [open, gameState, isPlaying]);
+
   const endGame = async () => {
     console.log('Ending game, final click count:', clickCount);
     setIsPlaying(false);
     
+    // Disable touch prevention
+    if (window.setPVPPlaying) {
+      window.setPVPPlaying(false);
+    }
+    
     if (!selectedChallenge) return;
     
-    // Demo mode - simulate game result
-    const demoOpponentScore = Math.floor(Math.random() * 50) + 20; // Random score between 20-70
-    const isWinner = clickCount > demoOpponentScore;
+    // Simulate opponent score (in real implementation, this would be the actual opponent's score)
+    const opponentScore = Math.floor(Math.random() * 50) + 20; // Random score between 20-70
+    const isWinner = clickCount > opponentScore;
     const opponentName = selectedChallenge.target_username || 'Ellenfél';
     
     // Calculate kaki rewards
     const kakiChange = isWinner ? 3 : -1; // Winner gets 3, loser loses 1
     
-    console.log('Game result:', { clickCount, demoOpponentScore, isWinner, opponentName, kakiChange });
+    console.log('Game result:', { clickCount, opponentScore, isWinner, opponentName, kakiChange });
     
     // Update kaki count in parent component
     if (onKakiUpdate) {
       onKakiUpdate(kakiChange);
     }
     
+    // Try to update the challenge in database
+    try {
+      const { error } = await supabase
+        .from('pvp_challenges')
+        .update({
+          challenger_score: selectedChallenge.challenger_id === user?.id ? clickCount : opponentScore,
+          target_score: selectedChallenge.target_id === user?.id ? clickCount : opponentScore,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          winner_id: isWinner ? user?.id : selectedChallenge.target_id
+        })
+        .eq('id', selectedChallenge.id);
+
+      if (error) {
+        console.error('Error updating challenge:', error);
+      }
+    } catch (error) {
+      console.error('Error updating challenge:', error);
+    }
+    
     // Store result for display
     setGameResult({
       playerScore: clickCount,
-      opponentScore: demoOpponentScore,
+      opponentScore: opponentScore,
       isWinner,
       reward: kakiChange,
       opponentName
@@ -227,7 +292,7 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
     
     toast({
       title: isWinner ? "🏆 Győzelem!" : "💀 Veszteség!",
-      description: `${isWinner ? 'Nyertél' : 'Vesztettél'} ${Math.abs(kakiChange)} kaki-t! (${clickCount} vs ${demoOpponentScore})`,
+      description: `${isWinner ? 'Nyertél' : 'Vesztettél'} ${Math.abs(kakiChange)} kaki-t! (${clickCount} vs ${opponentScore})`,
       variant: isWinner ? "default" : "destructive",
     });
     
@@ -241,30 +306,59 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
     try {
       console.log('Creating challenge:', { challenger_id: user.id, challenger_username: username, target_id: targetId, target_username: targetUsername });
       
-      // Create a demo challenge and start the game immediately
-      const demoChallenge = {
-        id: Date.now().toString(),
-        challenger_id: user.id,
-        challenger_username: username,
-        target_id: targetId,
-        target_username: targetUsername,
-        status: 'pending'
-      };
-      
-      console.log('Demo challenge created for:', targetUsername);
+      // Try to create real challenge first
+      const { data: challenge, error } = await supabase
+        .from('pvp_challenges')
+        .insert({
+          challenger_id: user.id,
+          challenger_username: username,
+          target_id: targetId,
+          target_username: targetUsername,
+          status: 'pending'
+        })
+        .select()
+        .single();
 
-      toast({
-        title: "⚔️ Kihívás elküldve!",
-        description: `${targetUsername} megkapta a kihívásod! (Demo mód)`,
-      });
+      if (error) {
+        console.error('Error creating challenge:', error);
+        // Fallback to demo mode
+        const demoChallenge = {
+          id: Date.now().toString(),
+          challenger_id: user.id,
+          challenger_username: username,
+          target_id: targetId,
+          target_username: targetUsername,
+          status: 'pending'
+        };
+        
+        console.log('Demo challenge created for:', targetUsername);
+        toast({
+          title: "⚔️ Kihívás elküldve!",
+          description: `${targetUsername} megkapta a kihívásod! (Demo mód)`,
+        });
 
-      // Start the game immediately
-      setSelectedChallenge(demoChallenge);
-      setClickCount(0);
-      setTimeLeft(8);
-      setIsPlaying(true);
-      setGameState('playing');
-      setGameResult(null); // Reset previous result
+        // Start the game immediately
+        setSelectedChallenge(demoChallenge);
+        setClickCount(0);
+        setTimeLeft(8);
+        setIsPlaying(true);
+        setGameState('playing');
+        setGameResult(null);
+      } else {
+        console.log('Real challenge created:', challenge);
+        toast({
+          title: "⚔️ Kihívás elküldve!",
+          description: `${targetUsername} megkapta a kihívásod!`,
+        });
+
+        // Start the game immediately
+        setSelectedChallenge(challenge);
+        setClickCount(0);
+        setTimeLeft(8);
+        setIsPlaying(true);
+        setGameState('playing');
+        setGameResult(null);
+      }
       
       // Force a re-render to ensure isPlaying is set
       setTimeout(() => {
@@ -285,13 +379,28 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
   const acceptChallenge = async (challenge: PVPChallenge) => {
     try {
       console.log('Accepting challenge:', challenge);
-      // Demo mode - start the game immediately
+      
+      // Try to update challenge status in database
+      try {
+        const { error } = await supabase
+          .from('pvp_challenges')
+          .update({ status: 'accepted' })
+          .eq('id', challenge.id);
+
+        if (error) {
+          console.error('Error updating challenge status:', error);
+        }
+      } catch (error) {
+        console.error('Error updating challenge status:', error);
+      }
+      
+      // Start the game immediately
       setSelectedChallenge(challenge);
       setClickCount(0);
       setTimeLeft(8);
       setIsPlaying(true);
       setGameState('playing');
-      setGameResult(null); // Reset previous result
+      setGameResult(null);
       
       // Force a re-render to ensure isPlaying is set
       setTimeout(() => {
@@ -309,8 +418,27 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
 
   const declineChallenge = async (challenge: PVPChallenge) => {
     try {
-      // Demo mode - just remove from local state
+      // Try to update challenge status in database
+      try {
+        const { error } = await supabase
+          .from('pvp_challenges')
+          .update({ status: 'declined' })
+          .eq('id', challenge.id);
+
+        if (error) {
+          console.error('Error updating challenge status:', error);
+        }
+      } catch (error) {
+        console.error('Error updating challenge status:', error);
+      }
+      
+      // Remove from local state
       setChallenges(prev => prev.filter(c => c.id !== challenge.id));
+      
+      toast({
+        title: "❌ Kihívás elutasítva",
+        description: "A kihívás elutasítva.",
+      });
     } catch (error) {
       console.error('Error declining challenge:', error);
     }
@@ -364,7 +492,7 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto">
+      <DialogContent className={`max-w-md mx-auto pvp-game-container ${gameState === 'playing' && isPlaying ? 'pvp-game-playing' : ''}`}>
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             ⚔️ PVP Kaki Harc
@@ -477,15 +605,24 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
               <div 
                 className="w-64 h-64 bg-primary rounded-full flex items-center justify-center cursor-pointer mx-auto transition-transform hover:scale-105 active:scale-95 select-none touch-manipulation"
                 onClick={handleClick}
-                onTouchStart={handleClick}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  handleClick();
+                }}
+                onTouchMove={(e) => e.preventDefault()}
+                onTouchEnd={(e) => e.preventDefault()}
+                onTouchCancel={(e) => e.preventDefault()}
                 style={{ 
                   userSelect: 'none', 
                   WebkitUserSelect: 'none',
                   WebkitTouchCallout: 'none',
-                  WebkitTapHighlightColor: 'transparent'
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'none',
+                  WebkitTouchAction: 'none',
+                  msTouchAction: 'none'
                 }}
               >
-                <div className="text-white text-8xl font-bold pointer-events-none">🚽</div>
+                <div className="text-white text-8xl font-bold pointer-events-none select-none">🚽</div>
               </div>
             </div>
 

@@ -40,3 +40,108 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Touch event handling for PVP game */
+.pvp-game-container {
+  touch-action: manipulation;
+  -webkit-touch-action: manipulation;
+  -ms-touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.pvp-game-container * {
+  touch-action: manipulation;
+  -webkit-touch-action: manipulation;
+  -ms-touch-action: manipulation;
+}
+
+/* Prevent zoom and text selection on mobile */
+@media (max-width: 768px) {
+  body {
+    touch-action: manipulation;
+    -webkit-touch-action: manipulation;
+    -ms-touch-action: manipulation;
+  }
+  
+  .pvp-game-container {
+    touch-action: manipulation;
+    -webkit-touch-action: manipulation;
+    -ms-touch-action: manipulation;
+  }
+}
+
+/* Stronger touch prevention */
+.pvp-game-container {
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -ms-touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.pvp-game-container * {
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -ms-touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Prevent all touch gestures */
+.pvp-game-container {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  -khtml-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -ms-touch-action: none !important;
+}
+
+/* Disable zoom on mobile */
+@media (max-width: 768px) {
+  html, body {
+    touch-action: manipulation !important;
+    -webkit-touch-action: manipulation !important;
+    -ms-touch-action: manipulation !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+  }
+}
+
+/* Touch prevention only during PVP game playing */
+.pvp-game-playing {
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -ms-touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.pvp-game-playing * {
+  touch-action: none !important;
+  -webkit-touch-action: none !important;
+  -ms-touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}

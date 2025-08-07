@@ -53,47 +53,78 @@ function PVPStatisticsContent({ user }: { user: SupabaseUser | null }) {
     try {
       setIsLoading(true);
       
-      // Demo mode - simulate PVP stats
-      const demoStats = {
-        totalMatches: Math.floor(Math.random() * 10) + 1,
-        wins: Math.floor(Math.random() * 8) + 1,
-        losses: Math.floor(Math.random() * 5),
-        winRate: '75.0',
-        bestScore: Math.floor(Math.random() * 30) + 40
-      };
-      
-      demoStats.losses = demoStats.totalMatches - demoStats.losses;
-      demoStats.winRate = ((demoStats.wins / demoStats.totalMatches) * 100).toFixed(1);
+      // Try to load real PVP stats
+      const { data: challenges, error } = await supabase
+        .from('pvp_challenges')
+        .select('*')
+        .or(`challenger_id.eq.${user?.id},target_id.eq.${user?.id}`)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false });
 
-      setPvpStats(demoStats);
+      if (error) {
+        console.error('Error loading PVP stats:', error);
+        // Fallback to demo stats
+        const demoStats = {
+          totalMatches: Math.floor(Math.random() * 10) + 1,
+          wins: Math.floor(Math.random() * 8) + 1,
+          losses: Math.floor(Math.random() * 5),
+          winRate: '75.0',
+          bestScore: Math.floor(Math.random() * 30) + 40
+        };
+        
+        demoStats.losses = demoStats.totalMatches - demoStats.losses;
+        demoStats.winRate = ((demoStats.wins / demoStats.totalMatches) * 100).toFixed(1);
 
-      // Demo recent matches
-      const demoMatches = [
-        {
-          id: 'demo1',
-          challenger_id: user?.id,
-          challenger_username: 'Te',
-          target_id: 'opponent1',
-          target_username: 'KakiKiraly',
-          challenger_score: 52,
-          target_score: 48,
-          winner_id: user?.id,
-          completed_at: new Date(Date.now() - 3600000).toISOString()
-        },
-        {
-          id: 'demo2',
-          challenger_id: 'opponent2',
-          challenger_username: 'WCMester',
-          target_id: user?.id,
-          target_username: 'Te',
-          challenger_score: 45,
-          target_score: 58,
-          winner_id: user?.id,
-          completed_at: new Date(Date.now() - 7200000).toISOString()
-        }
-      ];
+        setPvpStats(demoStats);
 
-      setRecentMatches(demoMatches);
+        // Demo recent matches
+        const demoMatches = [
+          {
+            id: 'demo1',
+            challenger_id: user?.id,
+            challenger_username: 'Te',
+            target_id: 'opponent1',
+            target_username: 'KakiKiraly',
+            challenger_score: 52,
+            target_score: 48,
+            winner_id: user?.id,
+            completed_at: new Date(Date.now() - 3600000).toISOString()
+          },
+          {
+            id: 'demo2',
+            challenger_id: 'opponent2',
+            challenger_username: 'WCMester',
+            target_id: user?.id,
+            target_username: 'Te',
+            challenger_score: 45,
+            target_score: 58,
+            winner_id: user?.id,
+            completed_at: new Date(Date.now() - 7200000).toISOString()
+          }
+        ];
+
+        setRecentMatches(demoMatches);
+      } else {
+        // Calculate real stats
+        const completedChallenges = challenges || [];
+        const totalMatches = completedChallenges.length;
+        const wins = completedChallenges.filter(c => c.winner_id === user?.id).length;
+        const losses = totalMatches - wins;
+        const winRate = totalMatches > 0 ? ((wins / totalMatches) * 100).toFixed(1) : '0.0';
+        const bestScore = Math.max(...completedChallenges.map(c => 
+          c.challenger_id === user?.id ? c.challenger_score : c.target_score
+        ), 0);
+
+        setPvpStats({
+          totalMatches,
+          wins,
+          losses,
+          winRate,
+          bestScore
+        });
+
+        setRecentMatches(completedChallenges.slice(0, 5));
+      }
     } catch (error) {
       console.error('Error loading PVP stats:', error);
     } finally {

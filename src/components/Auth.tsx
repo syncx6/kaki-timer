@@ -72,18 +72,66 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
         return;
       }
 
+      // For development, try to create user without email confirmation
+      // This will work if email confirmations are disabled in Supabase Dashboard
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             username: formData.username,
           }
         }
       });
 
+      console.log('Signup result:', { data, error });
+
+      if (error) {
+        // If signup fails due to email confirmation, try to sign in directly
+        console.log('Signup failed, trying direct sign in...');
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (signInError) {
+          throw error; // Throw original signup error
+        }
+
+        // Create profile for existing user
+        if (signInData.user) {
+          try {
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert([
+                {
+                  user_id: signInData.user.id,
+                  username: formData.username
+                }
+              ]);
+
+            if (profileError) {
+              console.warn('Profile creation warning:', profileError);
+            }
+          } catch (profileError) {
+            console.warn('Profile creation warning:', profileError);
+          }
+
+          toast({
+            title: "🎉 Bejelentkezés sikeres!",
+            description: "Üdv a WC Timer online világában!",
+            className: "fixed bottom-4 right-4 z-50",
+            duration: 2000,
+          });
+
+          onAuthSuccess();
+          return;
+        }
+      }
+
       if (error) throw error;
+
+      console.log('Registration result:', data);
 
       if (data.user) {
         // Create profile with username - wrapped in try-catch to handle RLS issues
@@ -93,7 +141,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
             .insert([
               {
                 user_id: data.user.id,
-                username: formData.username,
+                username: formData.username
+                // kaki_count will be added by default if column exists
               }
             ]);
 
@@ -106,15 +155,62 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
           // Continue anyway as the user account was created successfully
         }
 
-        toast({
-          title: "🎉 Regisztráció sikeres!",
-          description: "Üdv a WC Timer online világában!",
-          className: "fixed bottom-4 right-4 z-50",
-          duration: 1000,
-        });
+        // Check if user needs email confirmation
+        if (data.user.email_confirmed_at) {
+          // User is already confirmed, sign in immediately
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+          });
+
+          if (signInError) {
+            console.error('Auto sign-in error:', signInError);
+            toast({
+              title: "⚠️ Regisztráció sikeres, de bejelentkezés sikertelen",
+              description: "Kérlek jelentkezz be manuálisan!",
+              className: "fixed bottom-4 right-4 z-50",
+              duration: 3000,
+            });
+          } else {
+            toast({
+              title: "🎉 Regisztráció és bejelentkezés sikeres!",
+              description: "Üdv a WC Timer online világában!",
+              className: "fixed bottom-4 right-4 z-50",
+              duration: 2000,
+            });
+          }
+        } else {
+          // User needs email confirmation - but we'll try to sign in anyway
+          console.log('User needs email confirmation, trying to sign in anyway...');
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password,
+          });
+
+          if (signInError) {
+            toast({
+              title: "📧 Email megerősítés szükséges",
+              description: "Kérlek ellenőrizd az email fiókod és kattints a linkre!",
+              className: "fixed bottom-4 right-4 z-50",
+              duration: 5000,
+            });
+          } else {
+            toast({
+              title: "🎉 Regisztráció és bejelentkezés sikeres!",
+              description: "Üdv a WC Timer online világában!",
+              className: "fixed bottom-4 right-4 z-50",
+              duration: 2000,
+            });
+          }
+        }
+        
+        // Update username in localStorage immediately after successful registration
+        localStorage.setItem('wc-timer-username', formData.username);
+        
         onAuthSuccess();
       }
     } catch (error: any) {
+      console.error('Registration error:', error);
       toast({
         title: "❌ Regisztráció sikertelen",
         description: error.message || "Valami hiba történt!",
@@ -139,12 +235,39 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
       if (error) throw error;
+
+      // Check if user has a profile, if not create one
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('user_id', data.user.id)
+          .single();
+
+        if (!profile) {
+          // Create profile if it doesn't exist
+          await supabase
+            .from('profiles')
+            .insert([
+              {
+                user_id: data.user.id,
+                username: data.user.email?.split('@')[0] || 'Felhasználó'
+              }
+            ]);
+          
+          // Update localStorage with the username
+          localStorage.setItem('wc-timer-username', data.user.email?.split('@')[0] || 'Felhasználó');
+        } else {
+          // Update localStorage with the existing username
+          localStorage.setItem('wc-timer-username', profile.username);
+        }
+      }
 
       toast({
         title: "🎉 Bejelentkezés sikeres!",
@@ -154,9 +277,10 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
       });
       onAuthSuccess();
     } catch (error: any) {
+      console.error('Sign in error:', error);
       toast({
         title: "❌ Bejelentkezés sikertelen",
-        description: "Helytelen e-mail cím vagy jelszó!",
+        description: error.message || "Helytelen e-mail cím vagy jelszó!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });

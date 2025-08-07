@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>toilet-coin-tracker</title>
     <meta name="description" content="Lovable Generated Project" />
     <meta name="author" content="Lovable" />
@@ -20,5 +23,38 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Only prevent zoom when PVP game is actively playing
+      let isPVPPlaying = false;
+      
+      // Function to enable/disable touch prevention
+      window.setPVPPlaying = function(playing) {
+        isPVPPlaying = playing;
+      };
+      
+      document.addEventListener('touchstart', function(e) {
+        if (isPVPPlaying && e.touches.length > 1) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      document.addEventListener('touchmove', function(e) {
+        if (isPVPPlaying && e.touches.length > 1) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      // Prevent double tap zoom only during PVP game
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(event) {
+        if (isPVPPlaying) {
+          const now = (new Date()).getTime();
+          if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+          }
+          lastTouchEnd = now;
+        }
+      }, false);
+    </script>
   </body>
 </html>
