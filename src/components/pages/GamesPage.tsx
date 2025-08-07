@@ -94,35 +94,27 @@ export function GamesPage({ user, username, onKakiUpdate }: GamesPageProps) {
               }`}
               onClick={() => handleGameClick(game.id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-full ${game.color} flex items-center justify-center`}>
-                    <Icon className="w-6 h-6 text-white" />
+              <div className="flex items-center space-x-4">
+                <div className={`w-12 h-12 rounded-full ${game.color} flex items-center justify-center`}>
+                  <Icon className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold truncate">{game.title}</h3>
+                    {game.status === 'coming-soon' && (
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">
+                        Hamarosan
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold">{game.title}</h3>
-                      {game.status === 'coming-soon' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Hamarosan
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {game.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Users className="w-3 h-3" />
-                      {game.players}
-                    </div>
+                  <p className="text-sm text-muted-foreground mb-2 truncate">
+                    {game.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Users className="w-3 h-3" />
+                    <span className="truncate">{game.players}</span>
                   </div>
                 </div>
-                
-                {isAvailable && (
-                  <Button size="sm" variant="outline">
-                    Játszás
-                  </Button>
-                )}
               </div>
             </Card>
           );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Gamepad2, Users, User, Trophy } from 'lucide-react';
+import { Home, Gamepad2, Users, User, BarChart3 } from 'lucide-react';
 
 interface BottomNavigationProps {
   activeTab: 'home' | 'games' | 'social' | 'profile';
@@ -13,7 +13,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       id: 'home' as const,
       label: 'Főoldal',
       icon: Home,
-      description: 'Timer és statisztikák'
+      description: 'Dashboard és áttekintés'
     },
     {
       id: 'games' as const,
@@ -25,13 +25,13 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       id: 'social' as const,
       label: 'Közösség',
       icon: Users,
-      description: 'Toplista és barátok'
+      description: 'Ranglista és barátok'
     },
     {
       id: 'profile' as const,
       label: 'Profil',
       icon: User,
-      description: 'Beállítások és achievementek'
+      description: 'Beállítások és statisztikák'
     }
   ];
 

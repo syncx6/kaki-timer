@@ -121,14 +121,14 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto p-4">
+      <DialogContent className="max-w-md mx-auto p-4 flex flex-col h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             ⚙️ Beállítások
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 pt-4">
+        <div className="flex-1 overflow-y-auto space-y-6 pt-4">
           <Card className="p-6 border-2">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -235,7 +235,10 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
               </Button>
             </div>
           </Card>
+        </div>
 
+        {/* Fixed bottom buttons */}
+        <div className="flex-shrink-0 pt-4 space-y-4">
           <div className="flex gap-4">
             <Button
               onClick={onClose}

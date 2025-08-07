@@ -40,8 +40,7 @@ export function ProfilePage({
       description: 'Nézd meg a részletes statisztikáidat',
       icon: BarChart3,
       color: 'bg-blue-500',
-      status: 'available',
-      action: 'Megtekintés'
+      status: 'available'
     },
     {
       id: 'achievements',
@@ -49,8 +48,7 @@ export function ProfilePage({
       description: 'Nézd meg az elért eredményeidet',
       icon: Trophy,
       color: 'bg-yellow-500',
-      status: 'coming-soon',
-      action: 'Hamarosan'
+      status: 'coming-soon'
     },
     {
       id: 'rewards',
@@ -58,8 +56,7 @@ export function ProfilePage({
       description: 'Különleges jutalmak és bónuszok',
       icon: Award,
       color: 'bg-purple-500',
-      status: 'coming-soon',
-      action: 'Hamarosan'
+      status: 'coming-soon'
     }
   ];
 
@@ -77,7 +74,10 @@ export function ProfilePage({
   return (
     <div className="space-y-6 pb-20">
       {/* Profile Header */}
-      <Card className="p-6 border-2">
+      <Card 
+        className={`p-6 border-2 ${user ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200' : ''}`}
+        onClick={user ? () => setShowSettings(true) : undefined}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
@@ -102,15 +102,9 @@ export function ProfilePage({
           </div>
           
           {user && (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              Szerkesztés
-            </Button>
+            <div className="flex items-center justify-center w-10 h-10">
+              <Settings className="w-4 h-4 text-muted-foreground" />
+            </div>
           )}
         </div>
       </Card>
@@ -131,29 +125,23 @@ export function ProfilePage({
               }`}
               onClick={() => handleFeatureClick(feature.id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-full ${feature.color} flex items-center justify-center`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold">{feature.title}</h3>
-                      {feature.status === 'coming-soon' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Hamarosan
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {feature.description}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-4">
+                <div className={`w-12 h-12 rounded-full ${feature.color} flex items-center justify-center`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                
-                <Button size="sm" variant="outline">
-                  {feature.action}
-                </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold truncate">{feature.title}</h3>
+                    {feature.status === 'coming-soon' && (
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">
+                        Hamarosan
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
             </Card>
           );

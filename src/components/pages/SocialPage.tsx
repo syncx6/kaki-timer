@@ -21,8 +21,7 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
       description: 'Nézd meg a legjobb játékosokat',
       icon: Trophy,
       color: 'bg-yellow-500',
-      status: 'available',
-      action: 'Megtekintés'
+      status: 'available'
     },
     {
       id: 'friends',
@@ -30,8 +29,7 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
       description: 'Add hozzá barátaidat és játsz velük',
       icon: UserPlus,
       color: 'bg-blue-500',
-      status: 'coming-soon',
-      action: 'Hamarosan'
+      status: 'coming-soon'
     },
     {
       id: 'chat',
@@ -39,8 +37,7 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
       description: 'Beszélgess más játékosokkal',
       icon: MessageCircle,
       color: 'bg-green-500',
-      status: 'coming-soon',
-      action: 'Hamarosan'
+      status: 'coming-soon'
     },
     {
       id: 'guilds',
@@ -48,8 +45,7 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
       description: 'Csatlakozz vagy hozz létre csapatot',
       icon: Users,
       color: 'bg-purple-500',
-      status: 'coming-soon',
-      action: 'Hamarosan'
+      status: 'coming-soon'
     }
   ];
 
@@ -93,29 +89,23 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
               }`}
               onClick={() => handleFeatureClick(feature.id)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-full ${feature.color} flex items-center justify-center`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold">{feature.title}</h3>
-                      {feature.status === 'coming-soon' && (
-                        <Badge variant="secondary" className="text-xs">
-                          Hamarosan
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {feature.description}
-                    </p>
-                  </div>
+              <div className="flex items-center space-x-4">
+                <div className={`w-12 h-12 rounded-full ${feature.color} flex items-center justify-center`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                
-                <Button size="sm" variant="outline">
-                  {feature.action}
-                </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold truncate">{feature.title}</h3>
+                    {feature.status === 'coming-soon' && (
+                      <Badge variant="secondary" className="text-xs flex-shrink-0">
+                        Hamarosan
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {feature.description}
+                  </p>
+                </div>
               </div>
             </Card>
           );
