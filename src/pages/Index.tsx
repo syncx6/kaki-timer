@@ -41,8 +41,7 @@ const Index = () => {
             fetchUserProfile(session.user.id);
           }, 0);
         } else {
-          // Ne töröljük a felhasználónevet kijelentkezéskor, hogy offline módban is működjön
-          // setUsername('');
+          // A felhasználónév megmarad offline módban is
         }
       }
     );
@@ -81,26 +80,22 @@ const Index = () => {
             });
           
           if (!insertError) {
-            // Csak akkor állítjuk be, ha nincs localStorage-ból betöltött
-            if (!localStorage.getItem('wc-timer-username')) {
-              setUsername(userData.user.email?.split('@')[0] || 'Felhasználó');
-            }
+            // Mindig állítjuk be a felhasználónevet a profildból
+            setUsername(userData.user.email?.split('@')[0] || 'Felhasználó');
+            localStorage.setItem('wc-timer-username', userData.user.email?.split('@')[0] || 'Felhasználó');
           }
         }
         return;
       }
       
       console.log('Profile data:', data);
-      // Csak akkor állítjuk be a username-t, ha nincs már localStorage-ból betöltött
-      if (!localStorage.getItem('wc-timer-username')) {
-        setUsername(data?.username || 'Felhasználó');
-      }
+      // Mindig állítjuk be a felhasználónevet a profildból
+      setUsername(data?.username || 'Felhasználó');
+      localStorage.setItem('wc-timer-username', data?.username || 'Felhasználó');
     } catch (error) {
       console.error('Error fetching profile:', error);
-      // Csak akkor állítjuk be, ha nincs localStorage-ból betöltött
-      if (!localStorage.getItem('wc-timer-username')) {
-        setUsername('Felhasználó');
-      }
+      setUsername('Felhasználó');
+      localStorage.setItem('wc-timer-username', 'Felhasználó');
     }
   };
 
@@ -119,8 +114,7 @@ const Index = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // Ne töröljük a localStorage-ból a felhasználónevet, hogy offline módban is működjön
-    // setUsername(''); // Ezt kommenteljük ki
+    // A felhasználónév megmarad offline módban is
   };
 
   return (

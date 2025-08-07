@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, Settings, BarChart3, Globe } from 'lucide-react';
+import { Play, Square, Settings, BarChart3, Globe, Sword } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { UserStatusDropdown } from './UserStatusDropdown';
+import { PVPGame } from './PVPGame';
 
 interface TimerSession {
   id: string;
@@ -38,6 +39,7 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
   const [lastProgressCheck, setLastProgressCheck] = useState<Date | null>(null);
   const [kakiCount, setKakiCount] = useState(0);
   const [worker, setWorker] = useState<Worker | null>(null);
+  const [showPVPGame, setShowPVPGame] = useState(false);
   const { toast } = useToast();
 
   // Calculate hourly rate
@@ -281,6 +283,36 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
     return sessions.reduce((total, session) => total + session.earnedMoney, 0);
   };
 
+  const handleKakiUpdate = (change: number) => {
+    setKakiCount(prev => {
+      const newCount = Math.max(0, prev + change); // Ensure kaki count doesn't go below 0
+      
+      // Show toast notification
+      toast({
+        title: change > 0 ? "💩 Kaki nyert!" : "💩 Kaki elvesztve!",
+        description: `${change > 0 ? '+' : ''}${change} kaki (Összesen: ${newCount})`,
+        variant: change > 0 ? "default" : "destructive",
+      });
+      
+      // Update kaki count in Supabase if user is logged in
+      if (user) {
+        supabase
+          .from('profiles')
+          .update({ kaki_count: newCount })
+          .eq('user_id', user.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error('Error updating kaki count:', error);
+            } else {
+              console.log('Kaki count updated in database:', newCount);
+            }
+          });
+      }
+      
+      return newCount;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-primary/10 p-4">
       <UserStatusDropdown 
@@ -330,15 +362,29 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
               Kakilás Start! 🚀
             </Button>
           ) : (
-            <Button
-              onClick={handleStopTimer}
-              size="xl"
-              variant="destructive"
-              className="w-full text-2xl"
-            >
-              <Square className="w-8 h-8 mr-2" />
-              Befejezés 🏁
-            </Button>
+            <>
+              <Button
+                onClick={handleStopTimer}
+                size="xl"
+                variant="destructive"
+                className="w-full text-2xl"
+              >
+                <Square className="w-8 h-8 mr-2" />
+                Befejezés 🏁
+              </Button>
+              
+              {user && (
+                <Button
+                  onClick={() => setShowPVPGame(true)}
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Sword className="w-5 h-5 mr-2" />
+                  ⚔️ PVP Harc
+                </Button>
+              )}
+            </>
           )}
         </div>
 
@@ -442,6 +488,15 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* PVP Game */}
+        <PVPGame
+          open={showPVPGame}
+          onClose={() => setShowPVPGame(false)}
+          user={user}
+          username={username}
+          onKakiUpdate={handleKakiUpdate}
+        />
       </div>
     </div>
   );

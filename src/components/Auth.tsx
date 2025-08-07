@@ -247,7 +247,7 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="signup-username">Felhasználónév</Label>
+                <Label htmlFor="signup-username">Felhasználónév *</Label>
                 <Input
                   id="signup-username"
                   placeholder="kakikiraly"
@@ -256,6 +256,9 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
                   onKeyPress={handleKeyPress}
                   disabled={isLoading}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Ez a név megjelenik a statisztikákban és később módosítható a beállításokban
+                </p>
               </div>
               
               <div className="space-y-2">

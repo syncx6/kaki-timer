@@ -74,10 +74,16 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
             description: "Felhasználónév frissítése nem sikerült, de a többi beállítás mentve!",
             variant: "destructive",
           });
+        } else {
+          // Sikeres frissítés után mentjük localStorage-ba is
+          localStorage.setItem('wc-timer-username', newUsername.trim());
         }
       } catch (error) {
         console.error('Error updating profile:', error);
       }
+    } else {
+      // Offline módban csak localStorage-ba mentjük
+      localStorage.setItem('wc-timer-username', newUsername.trim());
     }
 
     onSave(salaryNum, workHoursNum, newUsername.trim());

@@ -38,6 +38,192 @@ interface LeaderboardEntry {
 
 
 
+function PVPStatisticsContent({ user }: { user: SupabaseUser | null }) {
+  const [pvpStats, setPvpStats] = useState<any>(null);
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      loadPVPStats();
+    }
+  }, [user]);
+
+  const loadPVPStats = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Demo mode - simulate PVP stats
+      const demoStats = {
+        totalMatches: Math.floor(Math.random() * 10) + 1,
+        wins: Math.floor(Math.random() * 8) + 1,
+        losses: Math.floor(Math.random() * 5),
+        winRate: '75.0',
+        bestScore: Math.floor(Math.random() * 30) + 40
+      };
+      
+      demoStats.losses = demoStats.totalMatches - demoStats.losses;
+      demoStats.winRate = ((demoStats.wins / demoStats.totalMatches) * 100).toFixed(1);
+
+      setPvpStats(demoStats);
+
+      // Demo recent matches
+      const demoMatches = [
+        {
+          id: 'demo1',
+          challenger_id: user?.id,
+          challenger_username: 'Te',
+          target_id: 'opponent1',
+          target_username: 'KakiKiraly',
+          challenger_score: 52,
+          target_score: 48,
+          winner_id: user?.id,
+          completed_at: new Date(Date.now() - 3600000).toISOString()
+        },
+        {
+          id: 'demo2',
+          challenger_id: 'opponent2',
+          challenger_username: 'WCMester',
+          target_id: user?.id,
+          target_username: 'Te',
+          challenger_score: 45,
+          target_score: 58,
+          winner_id: user?.id,
+          completed_at: new Date(Date.now() - 7200000).toISOString()
+        }
+      ];
+
+      setRecentMatches(demoMatches);
+    } catch (error) {
+      console.error('Error loading PVP stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('hu-HU', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (!user) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-4xl mb-2">⚔️</div>
+        <div className="text-muted-foreground">
+          Jelentkezz be a PVP statisztikák megtekintéséhez!
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="text-4xl mb-2">⏳</div>
+        <div className="text-muted-foreground">Betöltés...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="text-lg font-bold text-primary mb-3">
+          ⚔️ PVP Statisztikák
+        </h3>
+      </div>
+
+      {pvpStats && (
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="p-3 text-center border-2">
+            <div className="text-xl">🏆</div>
+            <div className="text-base font-bold text-primary">
+              {pvpStats.wins} / {pvpStats.totalMatches}
+            </div>
+            <div className="text-xs text-muted-foreground">Győzelmek</div>
+          </Card>
+
+          <Card className="p-3 text-center border-2">
+            <div className="text-xl">📊</div>
+            <div className="text-base font-bold text-success">
+              {pvpStats.winRate}%
+            </div>
+            <div className="text-xs text-muted-foreground">Győzelmi arány</div>
+          </Card>
+
+          <Card className="p-3 text-center border-2">
+            <div className="text-xl">⚡</div>
+            <div className="text-base font-bold text-warning">
+              {pvpStats.bestScore}
+            </div>
+            <div className="text-xs text-muted-foreground">Rekord kattintás</div>
+          </Card>
+
+          <Card className="p-3 text-center border-2">
+            <div className="text-xl">💩</div>
+            <div className="text-base font-bold text-accent-foreground">
+              {pvpStats.wins * 4}
+            </div>
+            <div className="text-xs text-muted-foreground">Nyert kaki</div>
+          </Card>
+        </div>
+      )}
+
+      {recentMatches.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="font-semibold text-sm">Legutóbbi meccsek</h4>
+          {recentMatches.map((match, index) => {
+            const isWinner = match.winner_id === user?.id;
+            const myScore = match.challenger_id === user?.id ? match.challenger_score : match.target_score;
+            const opponentScore = match.challenger_id === user?.id ? match.target_score : match.challenger_score;
+            const opponentName = match.challenger_id === user?.id ? match.target_username : match.challenger_username;
+
+            return (
+              <Card key={match.id} className="p-3 border-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl">
+                      {isWinner ? '🏆' : '😔'}
+                    </div>
+                    <div>
+                      <div className="font-bold text-primary text-sm">
+                        {myScore} vs {opponentScore}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        vs {opponentName} • {formatDate(match.completed_at || '')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-success text-sm">
+                      {isWinner ? '+4 💩' : '-1 💩'}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {(!pvpStats || pvpStats.totalMatches === 0) && (
+        <Card className="p-6 text-center border-2">
+          <div className="text-3xl mb-2">⚔️</div>
+          <div className="text-muted-foreground text-sm">
+            Még nincs PVP meccsed!<br />
+            Indítsd el a timer-t és próbáld ki a PVP harcot!
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function OnlineLeaderboardContent() {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null);
@@ -421,11 +607,12 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
           </div>
 
           <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 mx-4 mb-2">
-              <TabsTrigger value="overview">Áttekintés</TabsTrigger>
-              <TabsTrigger value="leaderboard">Saját Best Of</TabsTrigger>
-              <TabsTrigger value="online">Online</TabsTrigger>
-            </TabsList>
+                      <TabsList className="grid w-full grid-cols-4 mx-4 mb-2">
+            <TabsTrigger value="overview">Áttekintés</TabsTrigger>
+            <TabsTrigger value="leaderboard">Saját Best Of</TabsTrigger>
+            <TabsTrigger value="online">Online</TabsTrigger>
+            <TabsTrigger value="pvp">PVP</TabsTrigger>
+          </TabsList>
             
             <TabsContent value="overview" className="flex-1 space-y-3 px-4 pb-4">
             <div className="grid grid-cols-2 gap-3">
@@ -638,6 +825,10 @@ export function Statistics({ open, onClose, user }: StatisticsProps) {
 
           <TabsContent value="online" className="flex-1 space-y-3 px-4 pb-4">
             <OnlineLeaderboardContent />
+          </TabsContent>
+
+          <TabsContent value="pvp" className="flex-1 space-y-3 px-4 pb-4">
+            <PVPStatisticsContent user={user} />
           </TabsContent>
         </Tabs>
         
