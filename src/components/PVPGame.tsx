@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Trophy, Users, Clock, Target, Zap, Crown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Play, Square, Clock, DollarSign, Trophy, TrendingUp, Sword, Target, Zap, BarChart3, Users, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { PVPPlayerSearch } from './PVPPlayerSearch';
+import { PVPChallenge } from './PVPChallenge';
 
 interface PVPChallenge {
   id: string;
@@ -22,6 +23,18 @@ interface PVPChallenge {
   winner_id?: string;
 }
 
+interface PVPGameData {
+  id: string;
+  player_id: string;
+  player_username: string;
+  player_clicks: number;
+  opponent_id: string;
+  opponent_username: string;
+  opponent_clicks: number;
+  winner_id: string;
+  created_at: string;
+}
+
 interface PVPGameProps {
   open: boolean;
   onClose: () => void;
@@ -31,14 +44,10 @@ interface PVPGameProps {
 }
 
 export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGameProps) {
-  const [gameState, setGameState] = useState<'menu' | 'challenge' | 'playing' | 'result'>('menu');
-  const [clickCount, setClickCount] = useState(0);
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'result'>('menu');
   const [timeLeft, setTimeLeft] = useState(8);
+  const [clickCount, setClickCount] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [challenges, setChallenges] = useState<PVPChallenge[]>([]);
-  const [selectedChallenge, setSelectedChallenge] = useState<PVPChallenge | null>(null);
-  const [availablePlayers, setAvailablePlayers] = useState<{user_id: string, username: string}[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [gameResult, setGameResult] = useState<{
     playerScore: number;
     opponentScore: number;
@@ -46,444 +55,288 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
     reward: number;
     opponentName: string;
   } | null>(null);
+  const [showPlayerSearch, setShowPlayerSearch] = useState(false);
+  const [showChallenges, setShowChallenges] = useState(false);
+  const [currentOpponent, setCurrentOpponent] = useState<{id: string, name: string} | null>(null);
+  const gameInterval = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<number>(8);
+  const clickCountRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Load challenges and available players
-  useEffect(() => {
-    if (open && user) {
-      console.log('Loading PVP data for user:', user.id);
-      loadChallenges();
-      loadAvailablePlayers();
-    }
-  }, [open, user]);
-
-  const loadChallenges = async () => {
-    try {
-      console.log('Loading challenges for user:', user?.id);
-      
-      const { data, error } = await supabase
-        .from('pvp_challenges')
-        .select('*')
-        .or(`challenger_id.eq.${user?.id},target_id.eq.${user?.id}`)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading challenges:', error);
-        // If table doesn't exist, create demo challenges
-        const demoChallenges = [
-          {
-            id: 'demo1',
-            challenger_id: user?.id,
-            challenger_username: username,
-            target_id: 'demo_opponent1',
-            target_username: 'KakiKiraly',
-            challenger_score: 0,
-            target_score: 0,
-            status: 'pending',
-            created_at: new Date().toISOString()
-          }
-        ];
-        setChallenges(demoChallenges);
-        return;
-      }
-      
-      console.log('Challenges loaded:', data);
-      setChallenges(data || []);
-    } catch (error) {
-      console.error('Error loading challenges:', error);
-      setChallenges([]);
-    }
-  };
-
-  const loadAvailablePlayers = async () => {
-    try {
-      console.log('Loading available players for user:', user?.id);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, username')
-        .neq('user_id', user?.id)
-        .order('username');
-
-      if (error) {
-        console.error('Error loading players:', error);
-        // Fallback: create demo players
-        setAvailablePlayers([
-          { user_id: 'demo1', username: 'KakiKiraly' },
-          { user_id: 'demo2', username: 'WCMester' },
-          { user_id: 'demo3', username: 'TimerPro' }
-        ]);
-        return;
-      }
-      
-      console.log('Available players loaded:', data);
-      
-      // Filter out empty usernames and ensure we have valid data
-      const validPlayers = (data || []).filter(player => 
-        player.username && player.username.trim() !== '' && player.user_id
-      );
-      
-      if (validPlayers.length === 0) {
-        // If no real players, use demo players
-        setAvailablePlayers([
-          { user_id: 'demo1', username: 'KakiKiraly' },
-          { user_id: 'demo2', username: 'WCMester' },
-          { user_id: 'demo3', username: 'TimerPro' }
-        ]);
-      } else {
-        setAvailablePlayers(validPlayers);
-      }
-    } catch (error) {
-      console.error('Error loading players:', error);
-      // Fallback: create demo players
-      setAvailablePlayers([
-        { user_id: 'demo1', username: 'KakiKiraly' },
-        { user_id: 'demo2', username: 'WCMester' },
-        { user_id: 'demo3', username: 'TimerPro' }
-      ]);
-    }
-  };
-
   const startGame = () => {
-    console.log('Starting game...');
-    setClickCount(0);
-    setTimeLeft(8);
-    setIsPlaying(true);
     setGameState('playing');
-    setGameResult(null); // Reset previous result
-    console.log('Game started, isPlaying:', true, 'gameState: playing');
-    
-    // Enable touch prevention
-    if (window.setPVPPlaying) {
-      window.setPVPPlaying(true);
-    }
-    
-    // Force a re-render to ensure isPlaying is set
-    setTimeout(() => {
-      console.log('Game state after timeout - isPlaying:', true);
-    }, 100);
-  };
-
-  const handleClick = useCallback(() => {
-    console.log('Click detected! isPlaying:', isPlaying, 'timeLeft:', timeLeft);
-    if (isPlaying) {
-      // Start timer on first click
-      if (timeLeft === 8) {
-        console.log('First click - starting timer!');
-        setTimeLeft(7); // Start countdown from 7
-      } else if (timeLeft > 0) {
-        // Continue counting clicks
-        setClickCount(prev => {
-          const newCount = prev + 1;
-          console.log('Click! New count:', newCount);
-          return newCount;
-        });
-      }
-    }
-  }, [isPlaying, timeLeft]);
-
-  const resetGame = () => {
+    setIsPlaying(false); // Don't start playing yet, wait for first click
     setClickCount(0);
+    clickCountRef.current = 0; // Initialize click count ref
     setTimeLeft(8);
-    setIsPlaying(false);
-    setGameState('menu');
-    setSelectedChallenge(null);
-    setGameResult(null);
+    countdownRef.current = 8; // Initialize countdown ref
+    
+    // Enable PVP touch prevention
+    if (typeof window !== 'undefined' && (window as any).setPVPPlaying) {
+      (window as any).setPVPPlaying(true);
+    }
+    
+    // Don't start countdown automatically - wait for first click
   };
 
-  // Game timer
-  useEffect(() => {
-    console.log('Timer effect - isPlaying:', isPlaying, 'timeLeft:', timeLeft);
-    
-    if (isPlaying && timeLeft > 0 && timeLeft < 8) { // Only countdown when timer has started (timeLeft < 8)
-      const timer = setTimeout(() => {
-        console.log('Timer tick, timeLeft:', timeLeft - 1);
-        setTimeLeft(prev => prev - 1);
+  const handleClick = () => {
+    // If game hasn't started yet, start it on first click
+    if (!isPlaying && timeLeft === 8) {
+      setIsPlaying(true);
+      setTimeLeft(7);
+      setClickCount(1); // Start with 1 click
+      clickCountRef.current = 1; // Set click count ref
+      countdownRef.current = 7; // Set countdown ref
+      
+      // Clear any existing interval
+      if (gameInterval.current) {
+        clearInterval(gameInterval.current);
+        gameInterval.current = null;
+      }
+      
+      // Start countdown after first click with ref-based approach
+      gameInterval.current = setInterval(() => {
+        countdownRef.current -= 1;
+        
+        // Update the state immediately
+        setTimeLeft(countdownRef.current);
+        
+        if (countdownRef.current <= 0) {
+          if (gameInterval.current) {
+            clearInterval(gameInterval.current);
+            gameInterval.current = null;
+          }
+          endGame();
+        }
       }, 1000);
-
-      return () => clearTimeout(timer);
-    } else if (isPlaying && timeLeft === 0) {
-      console.log('Game ended, calling endGame');
-      endGame();
+      
+      return;
     }
-  }, [isPlaying, timeLeft]);
-
-  // Debug effect to monitor game state
-  useEffect(() => {
-    console.log('Game state changed - isPlaying:', isPlaying, 'clickCount:', clickCount, 'timeLeft:', timeLeft);
-  }, [isPlaying, clickCount, timeLeft]);
-
-  // Enable/disable global touch prevention based on game state
-  useEffect(() => {
-    if (open && gameState === 'playing' && isPlaying) {
-      // Enable touch prevention
-      if (window.setPVPPlaying) {
-        window.setPVPPlaying(true);
-      }
-    } else {
-      // Disable touch prevention
-      if (window.setPVPPlaying) {
-        window.setPVPPlaying(false);
-      }
+    
+    // If game is playing and time is left, count the click
+    if (isPlaying && timeLeft > 0) {
+      clickCountRef.current += 1; // Update ref immediately
+      setClickCount(prev => prev + 1);
     }
-
-    return () => {
-      // Always disable touch prevention when component unmounts
-      if (window.setPVPPlaying) {
-        window.setPVPPlaying(false);
-      }
-    };
-  }, [open, gameState, isPlaying]);
+  };
 
   const endGame = async () => {
-    console.log('Ending game, final click count:', clickCount);
+    // Disable PVP touch prevention
+    if (typeof window !== 'undefined' && (window as any).setPVPPlaying) {
+      (window as any).setPVPPlaying(false);
+    }
+    
     setIsPlaying(false);
     
-    // Disable touch prevention
-    if (window.setPVPPlaying) {
-      window.setPVPPlaying(false);
-    }
+    // Use the ref value for reliable click count
+    const finalClickCount = clickCountRef.current;
     
-    if (!selectedChallenge) return;
+    // Simulate opponent (CPU or real player)
+    const opponentScore = currentOpponent ? 
+      Math.floor(Math.random() * 50) + 30 : // Real player simulation
+      Math.floor(Math.random() * 50) + 30; // CPU opponent
     
-    // Simulate opponent score (in real implementation, this would be the actual opponent's score)
-    const opponentScore = Math.floor(Math.random() * 50) + 20; // Random score between 20-70
-    const isWinner = clickCount > opponentScore;
-    const opponentName = selectedChallenge.target_username || 'Ellenfél';
+    const isWinner = finalClickCount > opponentScore;
+    const kakiChange = isWinner ? 3 : -1;
+    const opponentName = currentOpponent?.name || "CPU Ellenfél";
     
-    // Calculate kaki rewards
-    const kakiChange = isWinner ? 3 : -1; // Winner gets 3, loser loses 1
+    // Create game data
+    const gameData = {
+      id: Date.now().toString(),
+      player_id: user?.id || 'anonymous',
+      player_username: username,
+      opponent_id: currentOpponent?.id || 'cpu_1',
+      opponent_username: opponentName,
+      player_clicks: finalClickCount,
+      opponent_clicks: opponentScore,
+      status: 'completed' as const,
+      created_at: new Date().toISOString(),
+      winner_id: isWinner ? user?.id || 'anonymous' : (currentOpponent?.id || 'cpu_1')
+    };
     
-    console.log('Game result:', { clickCount, opponentScore, isWinner, opponentName, kakiChange });
-    
-    // Update kaki count in parent component
-    if (onKakiUpdate) {
-      onKakiUpdate(kakiChange);
-    }
-    
-    // Try to update the challenge in database
+    // Save to localStorage first
     try {
-      const { error } = await supabase
-        .from('pvp_challenges')
-        .update({
-          challenger_score: selectedChallenge.challenger_id === user?.id ? clickCount : opponentScore,
-          target_score: selectedChallenge.target_id === user?.id ? clickCount : opponentScore,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          winner_id: isWinner ? user?.id : selectedChallenge.target_id
-        })
-        .eq('id', selectedChallenge.id);
-
-      if (error) {
-        console.error('Error updating challenge:', error);
-      }
+      const existingGames = JSON.parse(localStorage.getItem('wc-timer-pvp-games') || '[]');
+      existingGames.push(gameData);
+      localStorage.setItem('wc-timer-pvp-games', JSON.stringify(existingGames));
     } catch (error) {
-      console.error('Error updating challenge:', error);
+      console.error('Error saving to localStorage:', error);
+    }
+    
+    // Save to Supabase
+    if (user) {
+      try {
+        const { data, error } = await supabase
+          .from('timer_sessions') // Use existing table as fallback
+          .insert({
+            user_id: user.id,
+            start_time: new Date().toISOString(),
+            end_time: new Date().toISOString(),
+            duration: 8,
+            earned_money: 0,
+            kaki_earned: kakiChange,
+            salary: 0,
+            work_hours: 0
+          });
+
+        if (error) {
+          console.error('Error saving PVP result to Supabase:', error);
+        }
+        
+        // Update kaki count in Supabase
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('kaki_count')
+            .eq('user_id', user.id)
+            .single();
+          
+          const currentKaki = profileData?.kaki_count || 0;
+          const newKaki = currentKaki + kakiChange;
+          
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ kaki_count: newKaki })
+            .eq('user_id', user.id);
+          
+          if (updateError) {
+            console.error('Error updating kaki count:', updateError);
+          }
+        } catch (error) {
+          console.error('Error updating kaki count:', error);
+        }
+        
+        // Call the kaki update callback
+        if (onKakiUpdate) {
+          onKakiUpdate(kakiChange);
+        }
+        
+        // Refresh stats after save
+        if (typeof window !== 'undefined' && (window as any).refreshStats) {
+          setTimeout(() => {
+            (window as any).refreshStats();
+          }, 100);
+        }
+      } catch (error) {
+        console.error('Error saving PVP result:', error);
+      }
     }
     
     // Store result for display
     setGameResult({
-      playerScore: clickCount,
+      playerScore: finalClickCount,
       opponentScore: opponentScore,
       isWinner,
       reward: kakiChange,
       opponentName
     });
     
+    // Show result toast
     toast({
       title: isWinner ? "🏆 Győzelem!" : "💀 Veszteség!",
-      description: `${isWinner ? 'Nyertél' : 'Vesztettél'} ${Math.abs(kakiChange)} kaki-t! (${clickCount} vs ${opponentScore})`,
+      description: `${isWinner ? 'Nyertél' : 'Vesztettél'} ${Math.abs(kakiChange)} kaki-t! (${finalClickCount} vs ${opponentScore})`,
       variant: isWinner ? "default" : "destructive",
     });
     
     setGameState('result');
   };
 
-  const challengePlayer = async (targetId: string, targetUsername: string) => {
-    if (!user) return;
+  // Game timer - REMOVED THIS CONFLICTING useEffect
+  // useEffect(() => {
+  //   if (gameState === 'playing' && isPlaying && timeLeft > 0) {
+  //     gameInterval.current = setInterval(() => {
+  //       setTimeLeft(prev => {
+  //         if (prev <= 1) {
+  //           endGame();
+  //           return 0;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
+  //   }
 
-    setIsLoading(true);
-    try {
-      console.log('Creating challenge:', { challenger_id: user.id, challenger_username: username, target_id: targetId, target_username: targetUsername });
-      
-      // Try to create real challenge first
-      const { data: challenge, error } = await supabase
-        .from('pvp_challenges')
-        .insert({
-          challenger_id: user.id,
-          challenger_username: username,
-          target_id: targetId,
-          target_username: targetUsername,
-          status: 'pending'
-        })
-        .select()
-        .single();
+  //   return () => {
+  //     if (gameInterval.current) {
+  //       clearInterval(gameInterval.current);
+  //     }
+  //   };
+  // }, [gameState, isPlaying, timeLeft]);
 
-      if (error) {
-        console.error('Error creating challenge:', error);
-        // Fallback to demo mode
-        const demoChallenge = {
-          id: Date.now().toString(),
-          challenger_id: user.id,
-          challenger_username: username,
-          target_id: targetId,
-          target_username: targetUsername,
-          status: 'pending'
-        };
-        
-        console.log('Demo challenge created for:', targetUsername);
-        toast({
-          title: "⚔️ Kihívás elküldve!",
-          description: `${targetUsername} megkapta a kihívásod! (Demo mód)`,
-        });
-
-        // Start the game immediately
-        setSelectedChallenge(demoChallenge);
-        setClickCount(0);
-        setTimeLeft(8);
-        setIsPlaying(true);
-        setGameState('playing');
-        setGameResult(null);
-      } else {
-        console.log('Real challenge created:', challenge);
-        toast({
-          title: "⚔️ Kihívás elküldve!",
-          description: `${targetUsername} megkapta a kihívásod!`,
-        });
-
-        // Start the game immediately
-        setSelectedChallenge(challenge);
-        setClickCount(0);
-        setTimeLeft(8);
-        setIsPlaying(true);
-        setGameState('playing');
-        setGameResult(null);
+  // Touch prevention for PVP game
+  useEffect(() => {
+    if (open && gameState === 'playing' && isPlaying) {
+      // Enable touch prevention
+      if (typeof window !== 'undefined' && (window as any).setPVPPlaying) {
+        (window as any).setPVPPlaying(true);
       }
-      
-      // Force a re-render to ensure isPlaying is set
-      setTimeout(() => {
-        console.log('Challenge created - isPlaying:', true);
-      }, 100);
-    } catch (error) {
-      console.error('Error creating challenge:', error);
-      toast({
-        title: "❌ Hiba",
-        description: "Nem sikerült elküldeni a kihívást!",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const acceptChallenge = async (challenge: PVPChallenge) => {
-    try {
-      console.log('Accepting challenge:', challenge);
-      
-      // Try to update challenge status in database
-      try {
-        const { error } = await supabase
-          .from('pvp_challenges')
-          .update({ status: 'accepted' })
-          .eq('id', challenge.id);
-
-        if (error) {
-          console.error('Error updating challenge status:', error);
-        }
-      } catch (error) {
-        console.error('Error updating challenge status:', error);
+    } else {
+      // Disable touch prevention
+      if (typeof window !== 'undefined' && (window as any).setPVPPlaying) {
+        (window as any).setPVPPlaying(false);
       }
-      
-      // Start the game immediately
-      setSelectedChallenge(challenge);
-      setClickCount(0);
-      setTimeLeft(8);
-      setIsPlaying(true);
-      setGameState('playing');
-      setGameResult(null);
-      
-      // Force a re-render to ensure isPlaying is set
-      setTimeout(() => {
-        console.log('Challenge accepted - isPlaying:', true);
-      }, 100);
-      
-      toast({
-        title: "⚔️ Kihívás elfogadva!",
-        description: `${challenge.challenger_username} ellen játszol!`,
-      });
-    } catch (error) {
-      console.error('Error accepting challenge:', error);
     }
-  };
 
-  const declineChallenge = async (challenge: PVPChallenge) => {
-    try {
-      // Try to update challenge status in database
-      try {
-        const { error } = await supabase
-          .from('pvp_challenges')
-          .update({ status: 'declined' })
-          .eq('id', challenge.id);
-
-        if (error) {
-          console.error('Error updating challenge status:', error);
-        }
-      } catch (error) {
-        console.error('Error updating challenge status:', error);
+    return () => {
+      // Always disable touch prevention when component unmounts
+      if (typeof window !== 'undefined' && (window as any).setPVPPlaying) {
+        (window as any).setPVPPlaying(false);
       }
-      
-      // Remove from local state
-      setChallenges(prev => prev.filter(c => c.id !== challenge.id));
-      
-      toast({
-        title: "❌ Kihívás elutasítva",
-        description: "A kihívás elutasítva.",
-      });
-    } catch (error) {
-      console.error('Error declining challenge:', error);
-    }
-  };
-
-  const challengeRandom = async () => {
-    console.log('Available players:', availablePlayers);
-    
-    if (availablePlayers.length === 0) {
-      toast({
-        title: "😔 Nincs elérhető játékos",
-        description: "Próbáld újra később!",
-      });
-      return;
-    }
-
-    const randomPlayer = availablePlayers[Math.floor(Math.random() * availablePlayers.length)];
-    console.log('Selected random player:', randomPlayer);
-    
-    // Start the game immediately with random player
-    const demoChallenge = {
-      id: Date.now().toString(),
-      challenger_id: user?.id || '',
-      challenger_username: username,
-      target_id: randomPlayer.user_id,
-      target_username: randomPlayer.username,
-      status: 'pending'
+      // DON'T clear interval here - this was causing the bug!
+      // if (gameInterval.current) {
+      //   clearInterval(gameInterval.current);
+      // }
     };
+  }, [open, gameState, isPlaying]);
+
+  // Monitor timeLeft changes
+  useEffect(() => {
+    // If timeLeft reaches 0, end the game
+    if (timeLeft <= 0 && isPlaying) {
+      if (gameInterval.current) {
+        clearInterval(gameInterval.current);
+      }
+      endGame();
+    }
+  }, [timeLeft, isPlaying]);
+
+  // Cleanup interval on component unmount only
+  useEffect(() => {
+    return () => {
+      if (gameInterval.current) {
+        clearInterval(gameInterval.current);
+        gameInterval.current = null;
+      }
+    };
+  }, []); // Empty dependency array - only run on unmount
+
+  const handleChallengePlayer = (playerId: string, playerName: string) => {
+    // Check if player is online (simplified logic)
+    const isOnline = Math.random() > 0.5; // Simulate online status
     
-    setSelectedChallenge(demoChallenge);
-    setClickCount(0);
-    setTimeLeft(8);
-    setIsPlaying(true);
-    setGameState('playing');
-    setGameResult(null); // Reset previous result
-    
-    // Force a re-render to ensure isPlaying is set
-    setTimeout(() => {
-      console.log('Random challenge - isPlaying:', true);
-    }, 100);
-    
-    toast({
-      title: "⚔️ Random kihívás!",
-      description: `${randomPlayer.username} ellen játszol! (Demo mód)`,
-    });
+    if (isOnline) {
+      // Online player - start immediate battle
+      setCurrentOpponent({ id: playerId, name: playerName });
+      startGame();
+      
+      toast({
+        title: "⚔️ Online harc indítva!",
+        description: `${playerName} ellen harcolsz!`,
+      });
+    } else {
+      // Offline player - start CPU battle
+      setCurrentOpponent({ id: playerId, name: `${playerName} (CPU)` });
+      startGame();
+      
+      toast({
+        title: "🤖 CPU harc indítva!",
+        description: `${playerName} ellen harcolsz (CPU mód)!`,
+      });
+    }
+  };
+
+  const handleStartGame = (challengeId: string, opponentName: string) => {
+    setCurrentOpponent({ id: challengeId, name: opponentName });
+    startGame();
   };
 
   const formatTime = (seconds: number) => {
@@ -491,224 +344,178 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={`max-w-md mx-auto pvp-game-container ${gameState === 'playing' && isPlaying ? 'pvp-game-playing' : ''}`}>
-        <DialogHeader>
-          <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className={`max-w-md mx-auto p-2 sm:p-4 pt-8 pvp-game-container ${gameState === 'playing' && isPlaying ? 'pvp-game-playing' : ''}`}>
+                  <DialogHeader>
+          <DialogTitle className="text-center text-xl sm:text-2xl flex items-center justify-center gap-2">
             ⚔️ PVP Kaki Harc
           </DialogTitle>
+          <DialogDescription className="text-center text-sm text-muted-foreground">
+            Versenyezz más játékosokkal kattintási sebességben!
+          </DialogDescription>
         </DialogHeader>
 
-        {gameState === 'menu' && (
-          <div className="space-y-4">
-            <Card className="p-4 text-center">
-              <div className="text-3xl mb-2">🏆</div>
-              <div className="text-lg font-bold">Kaki Harc</div>
-              <div className="text-sm text-muted-foreground">
-                8 másodperc alatt minél többször kattints!
-              </div>
-            </Card>
+          {gameState === 'menu' && (
+            <div className="space-y-4">
+              <Card className="p-4 text-center">
+                <div className="text-3xl mb-2">🏆</div>
+                <div className="text-lg font-bold">PVP Kaki Harc</div>
+                <div className="text-sm text-muted-foreground">
+                  Válassz játékosokat vagy játssz CPU ellen!
+                </div>
+              </Card>
 
-            <div className="space-y-2">
-              <Button
-                onClick={() => setGameState('challenge')}
-                className="w-full"
-                size="lg"
-              >
-                <Users className="w-5 h-5 mr-2" />
-                Játékos Kiválasztása
-              </Button>
-
-              <Button
-                onClick={challengeRandom}
-                variant="outline"
-                className="w-full"
-                size="lg"
-                disabled={isLoading}
-              >
-                <Zap className="w-5 h-5 mr-2" />
-                Random Ellenfél
-              </Button>
-            </div>
-
-            {challenges.length > 0 && (
               <div className="space-y-2">
-                <h3 className="font-semibold">Aktív Kihívások</h3>
-                {challenges.filter(c => c.status === 'pending' && c.target_id === user?.id).map(challenge => (
-                  <Card key={challenge.id} className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold">{challenge.challenger_username}</div>
-                        <div className="text-xs text-muted-foreground">kihívott téged</div>
-                      </div>
-                      <div className="space-x-2">
-                        <Button
-                          onClick={() => acceptChallenge(challenge)}
-                          size="sm"
-                          variant="default"
-                        >
-                          Elfogad
-                        </Button>
-                        <Button
-                          onClick={() => declineChallenge(challenge)}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          Elutasít
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+                <Button
+                  onClick={() => setShowPlayerSearch(true)}
+                  className="w-full"
+                  size="lg"
+                >
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  Játékos Keresés
+                </Button>
+                
+                <Button
+                  onClick={() => setShowChallenges(true)}
+                  className="w-full"
+                  size="lg"
+                >
+                  <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  Kihívások
+                </Button>
+                
+                <Button
+                  onClick={startGame}
+                  className="w-full"
+                  size="lg"
+                >
+                  <Zap className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  CPU Ellenfél
+                </Button>
+                
+                <Button onClick={onClose} variant="outline" size="lg" className="w-full">
+                  Vissza
+                </Button>
               </div>
-            )}
-          </div>
-        )}
-
-        {gameState === 'challenge' && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-center">Válassz Ellenfelet</h3>
-            <div className="text-xs text-muted-foreground text-center">
-              {availablePlayers.length} játékos elérhető
             </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {availablePlayers.length === 0 ? (
-                <Card className="p-4 text-center">
-                  <div className="text-muted-foreground">Nincs elérhető játékos</div>
-                </Card>
-              ) : (
-                availablePlayers.map(player => (
-                  <Card key={player.user_id} className="p-3 cursor-pointer hover:bg-accent/50" onClick={() => challengePlayer(player.user_id, player.username)}>
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold">{player.username}</div>
-                      <Button size="sm" variant="outline">
-                        Kihívás
-                      </Button>
-                    </div>
-                  </Card>
-                ))
+          )}
+
+          {gameState === 'playing' && (
+            <div className="space-y-4 text-center">
+              <div className="text-3xl sm:text-4xl font-bold text-primary">
+                {timeLeft === 8 ? "Kezdés..." : formatTime(timeLeft)}
+              </div>
+              
+              <div className="relative">
+                <div 
+                  className="w-48 h-48 sm:w-64 sm:h-64 bg-primary rounded-full flex items-center justify-center cursor-pointer mx-auto transition-transform hover:scale-105 active:scale-95 select-none touch-manipulation"
+                  onClick={handleClick}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    handleClick();
+                  }}
+                  onTouchMove={(e) => e.preventDefault()}
+                  onTouchEnd={(e) => e.preventDefault()}
+                  onTouchCancel={(e) => e.preventDefault()}
+                  style={{
+                    touchAction: 'none'
+                  }}
+                >
+                  <div className="text-6xl sm:text-8xl">🚽</div>
+                </div>
+                
+                <div className="absolute -top-4 -right-4 bg-primary text-primary-foreground rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-base sm:text-lg font-bold">
+                  {clickCount}
+                </div>
+              </div>
+              
+              <div className="text-base sm:text-lg">
+                Kattintások: <span className="font-bold text-primary">{clickCount}</span>
+              </div>
+              
+              {currentOpponent && (
+                <div className="text-xs sm:text-sm text-muted-foreground">
+                  Ellenfél: {currentOpponent.name}
+                </div>
               )}
             </div>
-            <Button onClick={() => setGameState('menu')} variant="outline" className="w-full">
-              Vissza
-            </Button>
-          </div>
-        )}
+          )}
 
-        {gameState === 'playing' && (
-          <div className="space-y-4 text-center">
-            <div className="text-4xl font-bold text-primary">
-              {timeLeft === 8 ? "Kezdés..." : formatTime(timeLeft)}
-            </div>
-            
-            <div className="relative">
-              <div 
-                className="w-64 h-64 bg-primary rounded-full flex items-center justify-center cursor-pointer mx-auto transition-transform hover:scale-105 active:scale-95 select-none touch-manipulation"
-                onClick={handleClick}
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  handleClick();
-                }}
-                onTouchMove={(e) => e.preventDefault()}
-                onTouchEnd={(e) => e.preventDefault()}
-                onTouchCancel={(e) => e.preventDefault()}
-                style={{ 
-                  userSelect: 'none', 
-                  WebkitUserSelect: 'none',
-                  WebkitTouchCallout: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  touchAction: 'none',
-                  WebkitTouchAction: 'none',
-                  msTouchAction: 'none'
-                }}
-              >
-                <div className="text-white text-8xl font-bold pointer-events-none select-none">🚽</div>
-              </div>
-            </div>
-
-            <div className="text-2xl font-bold">
-              {clickCount} kattintás
-            </div>
-
-            <div className="text-sm text-muted-foreground">
-              {timeLeft === 8 ? "Kattints az első kattintásért!" : "Kattints minél gyorsabban!"}
-            </div>
-            
-            <div className="text-xs text-muted-foreground">
-              Debug: isPlaying={isPlaying.toString()}, timeLeft={timeLeft}
-            </div>
-          </div>
-        )}
-
-        {gameState === 'result' && gameResult && (
-          <div className="space-y-6 text-center">
-            {/* Header */}
-            <div className="space-y-2">
-              <div className="text-6xl mb-2">
-                {gameResult.isWinner ? "🏆" : "💀"}
+          {gameState === 'result' && gameResult && (
+            <div className="space-y-4 text-center">
+              <div className={`text-3xl sm:text-4xl font-bold ${gameResult.isWinner ? 'text-success' : 'text-destructive'}`}>
+                {gameResult.isWinner ? '🏆 Győzelem!' : '💀 Veszteség!'}
               </div>
               
-              <div className="text-3xl font-bold">
-                {gameResult.isWinner ? "GYŐZELEM!" : "VESZTESÉG!"}
-              </div>
-            </div>
-
-            {/* Score Panel */}
-            <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/20">
-              <div className="space-y-4">
-                <div className="text-lg font-semibold text-primary">
-                  ⚔️ PVP Harc Eredmény
+              <Card className="p-4 sm:p-6">
+                <div className="text-xl sm:text-2xl font-bold mb-4">
+                  {gameResult.playerScore} vs {gameResult.opponentScore}
                 </div>
                 
-                <div className="flex items-center justify-between text-2xl font-bold">
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground mb-1">Te</div>
-                    <div className="text-primary">{gameResult.playerScore}</div>
+                <div className="space-y-2 text-sm sm:text-base">
+                  <div className="flex justify-between">
+                    <span>Te:</span>
+                    <span className="font-bold">{gameResult.playerScore} kattintás</span>
                   </div>
-                  
-                  <div className="text-4xl font-bold text-muted-foreground">VS</div>
-                  
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground mb-1">{gameResult.opponentName}</div>
-                    <div className="text-destructive">{gameResult.opponentScore}</div>
+                  <div className="flex justify-between">
+                    <span>{gameResult.opponentName}:</span>
+                    <span className="font-bold">{gameResult.opponentScore} kattintás</span>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between">
+                      <span>Kaki változás:</span>
+                      <span className={`font-bold ${gameResult.reward > 0 ? 'text-success' : 'text-destructive'}`}>
+                        {gameResult.reward > 0 ? '+' : ''}{gameResult.reward} 💩
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-
-            {/* Reward Panel */}
-            <Card className={`p-4 border-2 ${gameResult.isWinner ? 'border-success/30 bg-success/10' : 'border-destructive/30 bg-destructive/10'}`}>
+              </Card>
+              
               <div className="space-y-2">
-                <div className="text-lg font-semibold">
-                  {gameResult.isWinner ? "🎉 Nyertél!" : "😔 Vesztettél"}
-                </div>
+                <Button
+                  onClick={() => {
+                    setGameState('menu');
+                    setGameResult(null);
+                    setClickCount(0);
+                    clickCountRef.current = 0; // Reset click count ref
+                    setTimeLeft(8);
+                    countdownRef.current = 8; // Reset countdown ref
+                    setIsPlaying(false);
+                    setCurrentOpponent(null);
+                  }}
+                  className="w-full"
+                  size="lg"
+                >
+                  Új Harc
+                </Button>
                 
-                <div className="text-2xl font-bold">
-                  {gameResult.isWinner ? "+" : ""}{gameResult.reward} 💩 kaki
-                </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  {gameResult.isWinner 
-                    ? "Nyertél 3 kaki-t a győzelemért!" 
-                    : "Elvesztettél 1 kaki-t a veszteségért"
-                  }
-                </div>
+                <Button onClick={onClose} variant="outline" size="lg" className="w-full">
+                  Vissza
+                </Button>
               </div>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button onClick={resetGame} className="w-full" size="lg">
-                🎮 Új Harc
-              </Button>
-              
-              <Button onClick={() => setGameState('menu')} variant="outline" className="w-full">
-                🏠 Vissza a Menübe
-              </Button>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Player Search Dialog */}
+      <PVPPlayerSearch
+        open={showPlayerSearch}
+        onClose={() => setShowPlayerSearch(false)}
+        user={user}
+        onChallengePlayer={handleChallengePlayer}
+      />
+
+      {/* Challenges Dialog */}
+      <PVPChallenge
+        open={showChallenges}
+        onClose={() => setShowChallenges(false)}
+        user={user}
+        username={username}
+        onStartGame={handleStartGame}
+      />
+    </>
   );
 } 

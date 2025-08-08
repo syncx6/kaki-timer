@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, Clock, DollarSign, Trophy, TrendingUp, Sword } from 'lucide-react';
+import { Play, Square, Clock, DollarSign, Trophy, TrendingUp, Sword, Target, Zap, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -17,6 +17,13 @@ interface TimerSession {
   username?: string;
 }
 
+interface PVPGame {
+  id: string;
+  player_id: string;
+  winner_id: string;
+  created_at: string;
+}
+
 interface HomePageProps {
   salary: number;
   workHours: number;
@@ -25,15 +32,17 @@ interface HomePageProps {
   isRunning: boolean;
   seconds: number;
   currentEarnings: number;
+  kakiCount: number;
+  totalEarnings: number;
   onStartTimer: () => void;
   onStopTimer: () => void;
   onOpenSettings: () => void;
   onOpenStats: () => void;
   onOpenAuth: () => void;
-  onOpenOnlineLeaderboard: () => void;
   onLogout: () => void;
   onKakiUpdate?: (change: number) => void;
   onNavigateToGames?: () => void;
+  onOpenPVPGame?: () => void;
 }
 
 export function HomePage({ 
@@ -44,15 +53,17 @@ export function HomePage({
   isRunning,
   seconds,
   currentEarnings,
+  kakiCount,
+  totalEarnings,
   onStartTimer,
   onStopTimer,
   onOpenSettings, 
   onOpenStats, 
   onOpenAuth, 
-  onOpenOnlineLeaderboard, 
   onLogout,
   onKakiUpdate,
-  onNavigateToGames
+  onNavigateToGames,
+  onOpenPVPGame
 }: HomePageProps) {
   const [sessions, setSessions] = useState<TimerSession[]>([]);
   const [showProgressCheck, setShowProgressCheck] = useState(false);
@@ -100,7 +111,8 @@ export function HomePage({
   };
 
   const getRecord = () => {
-    return sessions.length > 0 ? Math.max(...sessions.map(s => s.duration)) : null;
+    if (sessions.length === 0) return null;
+    return Math.max(...sessions.map(s => s.duration));
   };
 
   const getTotalTime = () => {
@@ -115,20 +127,100 @@ export function HomePage({
     return sessions.slice(0, 3);
   };
 
+  // Calculate next goal (record + 30 seconds)
+  const getNextGoal = () => {
+    const record = getRecord();
+    if (!record) return 300; // 5 minutes default
+    return record + 30;
+  };
+
+  // Calculate PVP stats
+  const getPVPStats = () => {
+    const pvpGames = JSON.parse(localStorage.getItem('wc-timer-pvp-games') || '[]');
+    const userGames = pvpGames.filter((game: PVPGame) => game.player_id === user?.id);
+    const wins = userGames.filter((game: PVPGame) => game.winner_id === user?.id).length;
+    const total = userGames.length;
+    return { wins, total, winRate: total > 0 ? Math.round((wins / total) * 100) : 0 };
+  };
+
+  // Calculate daily performance
+  const getDailyPerformance = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todaySessions = sessions.filter(session => {
+      const sessionDate = new Date(session.startTime);
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate.getTime() === today.getTime();
+    });
+    
+    const todayKaki = todaySessions.reduce((total, session) => total + (session.kaki_earned || 0), 0);
+    const yesterdayKaki = kakiCount - todayKaki; // Simplified calculation
+    
+    return {
+      today: todayKaki,
+      yesterday: yesterdayKaki,
+      change: todayKaki - yesterdayKaki
+    };
+  };
+
+  const handleProgressResponse = (continueWorking: boolean) => {
+    setShowProgressCheck(false);
+    setLastProgressCheck(new Date());
+    
+    if (!continueWorking) {
+      handleStopTimer();
+    }
+  };
+
+  // Progress check every 20 minutes
+  useEffect(() => {
+    if (isRunning && seconds > 0 && seconds % 1200 === 0) { // 20 minutes = 1200 seconds
+      const now = new Date();
+      if (!lastProgressCheck || (now.getTime() - lastProgressCheck.getTime()) > 60000) { // 1 minute cooldown
+        setShowProgressCheck(true);
+      }
+    }
+  }, [isRunning, seconds, lastProgressCheck]);
+
+  const pvpStats = getPVPStats();
+  const dailyPerformance = getDailyPerformance();
+  const nextGoal = getNextGoal();
+
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 pt-4">
       {/* Timer Display */}
-      <Card className="p-8 text-center shadow-fun border-2 min-h-[200px] flex items-center justify-center">
-        <div className="space-y-4">
-          <div className={`text-6xl font-black font-mono ${isRunning ? 'text-success animate-pulse' : 'text-primary'}`}>
-            {formatTime(seconds)}
-          </div>
-          
-          {isRunning && (
-            <div className="text-2xl font-bold text-success animate-bounce-in">
-              +{formatMoney(currentEarnings)} Ft
+      <Card className="p-6 border-2 bg-gradient-to-br from-primary/5 to-primary/10">
+        <div className="text-center space-y-4">
+          {/* Timer */}
+          <div className="space-y-2">
+            <div className="text-4xl sm:text-5xl font-mono font-bold text-primary">
+              {formatTime(seconds)}
             </div>
-          )}
+          </div>
+
+          {/* Earnings Display - Always show to maintain consistent height */}
+          <div className="space-y-2">
+            {isRunning ? (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  💰 Kerestél eddig:
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-success animate-bounce-in">
+                  +{formatMoney(currentEarnings)} Ft
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm text-muted-foreground">
+                  💰 Potenciális kereset:
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-muted-foreground">
+                  +0 Ft
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -139,9 +231,9 @@ export function HomePage({
             onClick={handleStartTimer}
             size="xl"
             variant="fun"
-            className="w-full text-2xl animate-wiggle"
+            className="w-full text-lg sm:text-2xl animate-wiggle"
           >
-            <Play className="w-8 h-8 mr-2" />
+            <Play className="w-6 h-6 sm:w-8 sm:h-8 mr-2" />
             Kakilás Start! 🚀
           </Button>
         ) : (
@@ -150,9 +242,9 @@ export function HomePage({
               onClick={handleStopTimer}
               size="xl"
               variant="destructive"
-              className="w-full text-2xl"
+              className="w-full text-lg sm:text-2xl"
             >
-              <Square className="w-8 h-8 mr-2" />
+              <Square className="w-6 h-6 sm:w-8 sm:h-8 mr-2" />
               Befejezés 🏁
             </Button>
             
@@ -161,9 +253,9 @@ export function HomePage({
                 onClick={onNavigateToGames}
                 size="lg"
                 variant="outline"
-                className="w-full"
+                className="w-full text-sm sm:text-base"
               >
-                <Sword className="w-5 h-5 mr-2" />
+                <Sword className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 ⚔️ PVP Harc Játszás
               </Button>
             )}
@@ -171,27 +263,95 @@ export function HomePage({
         )}
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 text-center border-2">
-          <div className="text-2xl font-bold text-primary">
-            {getRecord() ? formatTime(getRecord()!) : '--:--'}
+      {/* Action-Oriented Quick Stats */}
+      <div className="grid grid-cols-1 gap-4">
+        {/* Next Goal Card */}
+        <Card 
+          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
+          onClick={handleStartTimer}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Target className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-semibold truncate">🎯 Következő Cél</div>
+                <div className="text-xl sm:text-2xl font-bold text-blue-600 truncate">
+                  {formatTime(nextGoal)}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  Rekord: {getRecord() ? formatTime(getRecord()!) : '--:--'}
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-2">
+              <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
+              <div className="text-xs text-blue-600">Új időmérés</div>
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">Rekord idő 🏆</div>
         </Card>
-        
-        <Card className="p-4 text-center border-2">
-          <div className="text-2xl font-bold text-success">
-            {formatMoney(getTotalEarnings())} Ft
+
+        {/* PVP Challenge Card */}
+        <Card 
+          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
+          onClick={() => {
+            if (!user) {
+              onOpenAuth();
+            } else if (onOpenPVPGame) {
+              onOpenPVPGame();
+            } else {
+              onNavigateToGames?.();
+            }
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Sword className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-semibold truncate">⚔️ PVP Kihívás</div>
+                <div className="text-xl sm:text-2xl font-bold text-red-600 truncate">
+                  {pvpStats.wins}/{pvpStats.total}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  Win rate: {pvpStats.winRate}%
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-2">
+              <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
+              <div className="text-xs text-red-600">CPU Harc</div>
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">Össz kereset 💰</div>
         </Card>
-        
-        <Card className="p-4 text-center border-2">
-          <div className="text-2xl font-bold text-yellow-600">
-            {sessions.reduce((total, session) => total + (session.kaki_earned || 0), 0)} 💩
+
+        {/* Daily Performance Card */}
+        <Card 
+          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
+          onClick={onOpenStats}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <BarChart3 className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-semibold truncate">🏆 Napi Teljesítmény</div>
+                <div className="text-xl sm:text-2xl font-bold text-yellow-600 truncate">
+                  +{dailyPerformance.today}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  Ma: +{dailyPerformance.today}, Tegnap: +{dailyPerformance.yesterday}
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-2">
+              <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
+              <div className="text-xs text-yellow-600">Statisztikák</div>
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">Össz kaki</div>
         </Card>
       </div>
 

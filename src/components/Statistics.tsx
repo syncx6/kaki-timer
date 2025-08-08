@@ -3,12 +3,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Trophy, Clock, DollarSign, Calendar, Upload, Download, User } from 'lucide-react';
+import { X, Trophy, Clock, DollarSign, Calendar, Upload, Download, User, BarChart3, Sword } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
+import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { OverviewDashboard } from '@/components/dashboard/OverviewDashboard';
+import { PVPDashboard } from '@/components/dashboard/PVPDashboard';
+import { TimerDashboard } from '@/components/dashboard/TimerDashboard';
+import type { OverviewStats, PVPStats, TimerStats } from '@/types/statistics';
 
 interface TimerSession {
   id: string;
@@ -36,286 +40,87 @@ interface LeaderboardEntry {
   max_earned: number;
 }
 
-
-
-function PVPStatisticsContent({ user }: { user: SupabaseUser | null }) {
-  const [pvpStats, setPvpStats] = useState<any>(null);
-  const [recentMatches, setRecentMatches] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      loadPVPStats();
-    }
-  }, [user]);
-
-  const loadPVPStats = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Try to load real PVP stats
-      const { data: challenges, error } = await supabase
-        .from('pvp_challenges')
-        .select('*')
-        .or(`challenger_id.eq.${user?.id},target_id.eq.${user?.id}`)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading PVP stats:', error);
-        // Fallback to demo stats
-        const demoStats = {
-          totalMatches: Math.floor(Math.random() * 10) + 1,
-          wins: Math.floor(Math.random() * 8) + 1,
-          losses: Math.floor(Math.random() * 5),
-          winRate: '75.0',
-          bestScore: Math.floor(Math.random() * 30) + 40
-        };
-        
-        demoStats.losses = demoStats.totalMatches - demoStats.losses;
-        demoStats.winRate = ((demoStats.wins / demoStats.totalMatches) * 100).toFixed(1);
-
-        setPvpStats(demoStats);
-
-        // Demo recent matches
-        const demoMatches = [
-          {
-            id: 'demo1',
-            challenger_id: user?.id,
-            challenger_username: 'Te',
-            target_id: 'opponent1',
-            target_username: 'KakiKiraly',
-            challenger_score: 52,
-            target_score: 48,
-            winner_id: user?.id,
-            completed_at: new Date(Date.now() - 3600000).toISOString()
-          },
-          {
-            id: 'demo2',
-            challenger_id: 'opponent2',
-            challenger_username: 'WCMester',
-            target_id: user?.id,
-            target_username: 'Te',
-            challenger_score: 45,
-            target_score: 58,
-            winner_id: user?.id,
-            completed_at: new Date(Date.now() - 7200000).toISOString()
-          }
-        ];
-
-        setRecentMatches(demoMatches);
-      } else {
-        // Calculate real stats
-        const completedChallenges = challenges || [];
-        const totalMatches = completedChallenges.length;
-        const wins = completedChallenges.filter(c => c.winner_id === user?.id).length;
-        const losses = totalMatches - wins;
-        const winRate = totalMatches > 0 ? ((wins / totalMatches) * 100).toFixed(1) : '0.0';
-        const bestScore = Math.max(...completedChallenges.map(c => 
-          c.challenger_id === user?.id ? c.challenger_score : c.target_score
-        ), 0);
-
-        setPvpStats({
-          totalMatches,
-          wins,
-          losses,
-          winRate,
-          bestScore
-        });
-
-        setRecentMatches(completedChallenges.slice(0, 5));
-      }
-    } catch (error) {
-      console.error('Error loading PVP stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('hu-HU', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (!user) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-4xl mb-2">⚔️</div>
-        <div className="text-muted-foreground">
-          Jelentkezz be a PVP statisztikák megtekintéséhez!
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-4xl mb-2">⏳</div>
-        <div className="text-muted-foreground">Betöltés...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="text-center">
-        <h3 className="text-lg font-bold text-primary mb-3">
-          ⚔️ PVP Statisztikák
-        </h3>
-      </div>
-
-      {pvpStats && (
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="p-3 text-center border-2">
-            <div className="text-xl">🏆</div>
-            <div className="text-base font-bold text-primary">
-              {pvpStats.wins} / {pvpStats.totalMatches}
-            </div>
-            <div className="text-xs text-muted-foreground">Győzelmek</div>
-          </Card>
-
-          <Card className="p-3 text-center border-2">
-            <div className="text-xl">📊</div>
-            <div className="text-base font-bold text-success">
-              {pvpStats.winRate}%
-            </div>
-            <div className="text-xs text-muted-foreground">Győzelmi arány</div>
-          </Card>
-
-          <Card className="p-3 text-center border-2">
-            <div className="text-xl">⚡</div>
-            <div className="text-base font-bold text-warning">
-              {pvpStats.bestScore}
-            </div>
-            <div className="text-xs text-muted-foreground">Rekord kattintás</div>
-          </Card>
-
-          <Card className="p-3 text-center border-2">
-            <div className="text-xl">💩</div>
-            <div className="text-base font-bold text-accent-foreground">
-              {pvpStats.wins * 4}
-            </div>
-            <div className="text-xs text-muted-foreground">Nyert kaki</div>
-          </Card>
-        </div>
-      )}
-
-      {recentMatches.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm">Legutóbbi meccsek</h4>
-          {recentMatches.map((match, index) => {
-            const isWinner = match.winner_id === user?.id;
-            const myScore = match.challenger_id === user?.id ? match.challenger_score : match.target_score;
-            const opponentScore = match.challenger_id === user?.id ? match.target_score : match.challenger_score;
-            const opponentName = match.challenger_id === user?.id ? match.target_username : match.challenger_username;
-
-            return (
-              <Card key={match.id} className="p-3 border-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-xl">
-                      {isWinner ? '🏆' : '😔'}
-                    </div>
-                    <div>
-                      <div className="font-bold text-primary text-sm">
-                        {myScore} vs {opponentScore}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        vs {opponentName} • {formatDate(match.completed_at || '')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-success text-sm">
-                      {isWinner ? '+4 💩' : '-1 💩'}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {(!pvpStats || pvpStats.totalMatches === 0) && (
-        <Card className="p-6 text-center border-2">
-          <div className="text-3xl mb-2">⚔️</div>
-          <div className="text-muted-foreground text-sm">
-            Még nincs PVP meccsed!<br />
-            Indítsd el a timer-t és próbáld ki a PVP harcot!
-          </div>
-        </Card>
-      )}
-    </div>
-  );
+interface PVPGameData {
+  id: string;
+  player_id: string;
+  player_username: string;
+  player_clicks: number;
+  opponent_id: string;
+  opponent_username: string;
+  opponent_clicks: number;
+  created_at: string;
 }
 
 function OnlineLeaderboardContent() {
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
-  const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  const fetchLeaderboard = async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('timer_sessions')
-        .select('user_id, duration, earned_money');
-
-      if (error) throw error;
-
-      // Get profiles separately
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('user_id, username, kaki_count');
-
-      if (profileError) throw profileError;
-
-      // Group by user and calculate totals
-      const userStats = data?.reduce((acc: Record<string, LeaderboardEntry>, session) => {
-        if (!acc[session.user_id]) {
-          const profile = profiles?.find(p => p.user_id === session.user_id);
-          acc[session.user_id] = {
-            user_id: session.user_id,
-            username: profile?.username || `User #${session.user_id.slice(0, 8)}`,
-            kaki_count: profile?.kaki_count || 0,
-            total_duration: 0,
-            total_earned: 0,
-            session_count: 0,
-            max_duration: 0,
-            max_earned: 0,
-          };
-        }
-        
-        acc[session.user_id].total_duration += session.duration;
-        acc[session.user_id].total_earned += session.earned_money;
-        acc[session.user_id].session_count += 1;
-        acc[session.user_id].max_duration = Math.max(acc[session.user_id].max_duration, session.duration);
-        acc[session.user_id].max_earned = Math.max(acc[session.user_id].max_earned, session.earned_money);
-        
-        return acc;
-      }, {}) || {};
-
-      // Convert to array and sort by total duration
-      const sortedStats = Object.values(userStats).sort((a, b) => b.total_duration - a.total_duration);
-      
-      setLeaderboardData(sortedStats);
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchLeaderboard();
   }, []);
 
+  const fetchLeaderboard = async () => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, username, kaki_count')
+        .order('kaki_count', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching leaderboard:', error);
+        setLeaderboard([]);
+      } else {
+        // Fetch additional stats for each user
+        const leaderboardWithStats = await Promise.all(
+          (data || []).map(async (user) => {
+            try {
+              // Fetch user's timer sessions
+              const { data: sessionsData } = await supabase
+                .from('timer_sessions')
+                .select('duration, earned_money')
+                .eq('user_id', user.user_id);
+
+              const totalDuration = sessionsData?.reduce((sum, session) => sum + (session.duration || 0), 0) || 0;
+              const totalEarned = sessionsData?.reduce((sum, session) => sum + (session.earned_money || 0), 0) || 0;
+              const sessionCount = sessionsData?.length || 0;
+              const maxDuration = sessionsData?.reduce((max, session) => Math.max(max, session.duration || 0), 0) || 0;
+              const maxEarned = sessionsData?.reduce((max, session) => Math.max(max, session.earned_money || 0), 0) || 0;
+
+              return {
+                ...user,
+                total_duration: totalDuration,
+                total_earned: totalEarned,
+                session_count: sessionCount,
+                max_duration: maxDuration,
+                max_earned: maxEarned
+              };
+            } catch (error) {
+              console.error('Error fetching user stats:', error);
+              return {
+                ...user,
+                total_duration: 0,
+                total_earned: 0,
+                session_count: 0,
+                max_duration: 0,
+                max_earned: 0
+              };
+            }
+          })
+        );
+
+        setLeaderboard(leaderboardWithStats);
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+      setLeaderboard([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -332,544 +137,423 @@ function OnlineLeaderboardContent() {
   };
 
   return (
-    <>
+    <div className="space-y-4">
       <div className="text-center">
         <h3 className="text-lg font-bold text-primary mb-3">
-          🌐 Online Toplista
+          🏆 Online Ranglista
         </h3>
+        <p className="text-sm text-muted-foreground">
+          A legjobb játékosok kaki egyenlege
+        </p>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-6">
-          <div className="text-3xl mb-2">⏳</div>
-          <div className="text-muted-foreground text-sm">Betöltés...</div>
-        </div>
-      ) : leaderboardData.length === 0 ? (
-        <div className="text-center py-6">
-          <div className="text-3xl mb-2">🚽</div>
-          <div className="text-muted-foreground text-sm">
-            Még nincs online rekord!<br />
-            Legyél te az első! 😄
-          </div>
+        <div className="text-center py-8">
+          <div className="text-muted-foreground">Betöltés...</div>
         </div>
       ) : (
         <div className="space-y-2">
-          {leaderboardData.map((entry, index) => (
-            <div key={entry.user_id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setSelectedUser(entry)}>
-              <div className="flex items-center gap-2">
-                <div className={`text-xl ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🎯'}`}>
-                  {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+          {leaderboard.map((entry, index) => (
+            <Card key={entry.user_id} className="p-4 border-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl">
+                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                  </div>
+                  <div>
+                    <div className="font-bold text-primary">
+                      {entry.username}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {entry.session_count} kakilás
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-semibold flex items-center gap-2 text-sm">
-                    {entry.username}
-                    <span className="text-base">💩{entry.kaki_count || 0}</span>
+                <div className="text-right">
+                  <div className="font-bold text-yellow-600 text-lg">
+                    {entry.kaki_count} 💩
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {entry.session_count} munkamenet
+                    {formatTime(entry.total_duration)}
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-base">
-                  {formatTime(entry.total_duration)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatMoney(entry.total_earned)} Ft
-                </div>
-              </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
-
-      {/* User Details Dialog */}
-      {selectedUser && (
-        <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-          <DialogContent className="max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
-                <User className="w-6 h-6" />
-                {selectedUser.username}
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4 pt-4">
-              <Card className="p-4 space-y-3">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">💩</div>
-                  <div className="text-2xl font-bold">{selectedUser.kaki_count}</div>
-                  <div className="text-sm text-muted-foreground">Kaki jelvény</div>
-                </div>
-              </Card>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-4 text-center">
-                  <div className="text-sm text-muted-foreground">Összes munkamenet</div>
-                  <div className="text-xl font-bold">{selectedUser.session_count}</div>
-                </Card>
-                
-                <Card className="p-4 text-center">
-                  <div className="text-sm text-muted-foreground">Összes idő</div>
-                  <div className="text-xl font-bold">{formatTime(selectedUser.total_duration)}</div>
-                </Card>
-                
-                <Card className="p-4 text-center">
-                  <div className="text-sm text-muted-foreground">Leghosszabb</div>
-                  <div className="text-xl font-bold">{formatTime(selectedUser.max_duration)}</div>
-                </Card>
-                
-                <Card className="p-4 text-center">
-                  <div className="text-sm text-muted-foreground">Legtöbb pénz</div>
-                  <div className="text-xl font-bold">{formatMoney(selectedUser.max_earned)} Ft</div>
-                </Card>
-              </div>
-
-              <Card className="p-4 text-center bg-primary/10">
-                <div className="text-sm text-muted-foreground">Összes keresett pénz</div>
-                <div className="text-2xl font-bold text-primary">
-                  {formatMoney(selectedUser.total_earned)} Ft
-                </div>
-              </Card>
-
-              <Button onClick={() => setSelectedUser(null)} variant="outline" size="lg" className="w-full">
-                <X className="w-5 h-5 mr-2" />
-                Bezárás
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </>
+    </div>
   );
 }
 
 export function Statistics({ open, onClose, user }: StatisticsProps) {
   const [sessions, setSessions] = useState<TimerSession[]>([]);
-  const [showDetailedCharts, setShowDetailedCharts] = useState(false);
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'pvp' | 'timer'>('overview');
   const { toast } = useToast();
 
+  // Tab order for swipe gestures
+  const tabOrder: Array<'overview' | 'pvp' | 'timer'> = ['overview', 'pvp', 'timer'];
+
+  const handleSwipeLeft = () => {
+    const currentIndex = tabOrder.indexOf(activeTab);
+    // Only move to next if not at the end
+    if (currentIndex < tabOrder.length - 1) {
+      const nextIndex = currentIndex + 1;
+      setActiveTab(tabOrder[nextIndex]);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    const currentIndex = tabOrder.indexOf(activeTab);
+    // Only move to previous if not at the beginning
+    if (currentIndex > 0) {
+      const prevIndex = currentIndex - 1;
+      setActiveTab(tabOrder[prevIndex]);
+    }
+  };
+
+  // Swipe gesture hook
+  const swipeRef = useSwipeGesture({
+    onSwipeLeft: handleSwipeLeft,
+    onSwipeRight: handleSwipeRight,
+    minSwipeDistance: 60,
+    maxSwipeTime: 400
+  });
+
   useEffect(() => {
-    const saved = localStorage.getItem('wc-timer-sessions');
-    if (saved) {
-      const parsed = JSON.parse(saved).map((s: any) => ({
-        ...s,
-        startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
-      }));
-      setSessions(parsed);
+    if (open && user) {
+      fetchRealStats();
     }
-  }, [open]);
+  }, [open, user]);
 
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  // Add a global function to refresh stats
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).refreshStats = fetchRealStats;
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }, [user]);
+
+  const fetchRealStats = async () => {
+    if (!user) return;
+
+    try {
+      // Fetch timer sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('timer_sessions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (sessionsError) {
+        console.error('Error fetching timer sessions:', sessionsError);
+      }
+
+      // Fetch PVP data from localStorage (since pvp_challenges table might not exist yet)
+      let pvpData: PVPGameData[] = [];
+      try {
+        const localStorageGames = JSON.parse(localStorage.getItem('wc-timer-pvp-games') || '[]');
+        const userGames = localStorageGames.filter((game: PVPGameData) => 
+          game.player_id === user?.id || game.opponent_id === user?.id
+        );
+        
+        if (userGames.length > 0) {
+          pvpData = userGames;
+        }
+      } catch (error) {
+        console.log('Error reading localStorage PVP data:', error);
+      }
+
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('kaki_count')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+      }
+
+      // Process timer stats
+      const timerStats = processTimerStats(sessionsData || []);
+      
+      // Process PVP stats
+      const pvpStats = processPVPStats(pvpData, user?.id || '');
+      
+
+
+      // Calculate total kaki
+      const totalKaki = profileData?.kaki_count || 0;
+
+      setStats({
+        totalKaki,
+        pvpStats,
+        timerStats,
+        achievements: []
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Only use demo data if there's a real error
+      setStats(generateDemoStats());
+    }
   };
 
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('hu-HU').format(Math.round(amount));
-  };
+  // Generate demo data for the new dashboard structure
+  const generateDemoStats = (): OverviewStats => {
+    const pvpStats: PVPStats = {
+      totalMatches: 42,
+      wins: 28,
+      losses: 14,
+      winRate: 67,
+      bestCPS: 8.2,
+      averageCPS: 6.8,
+      bestClickRecord: 89,
+      kakiEarned: 84,
+      kakiLost: 14,
+      weeklyStats: [
+        { week: '1. hét', matches: 8, wins: 6, averageCPS: 6.5, kakiEarned: 18 },
+        { week: '2. hét', matches: 12, wins: 8, averageCPS: 7.1, kakiEarned: 24 },
+        { week: '3. hét', matches: 10, wins: 7, averageCPS: 6.9, kakiEarned: 21 },
+        { week: '4. hét', matches: 12, wins: 7, averageCPS: 7.2, kakiEarned: 21 }
+      ],
+      recentMatches: [
+        { id: '1', opponent: 'KakiKiraly', result: 'win', clicks: 67, cps: 8.4, kakiChange: 3, date: new Date() },
+        { id: '2', opponent: 'WCMester', result: 'loss', clicks: 45, cps: 5.6, kakiChange: -1, date: new Date() },
+        { id: '3', opponent: 'ToiletPro', result: 'win', clicks: 78, cps: 9.8, kakiChange: 3, date: new Date() }
+      ]
+    };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('hu-HU', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  const getStats = () => {
-    if (sessions.length === 0) {
-      return {
-        totalTime: 0,
-        totalEarnings: 0,
-        averageTime: 0,
-        longestSession: 0,
-        sessionsThisMonth: 0,
-        totalSessions: 0,
-      };
-    }
-
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const thisMonthSessions = sessions.filter(s => 
-      s.startTime.getMonth() === currentMonth && 
-      s.startTime.getFullYear() === currentYear
-    );
+    const timerStats: TimerStats = {
+      totalSessions: 127,
+      totalTime: 66720, // 18h 32m
+      averageTime: 525, // 8m 45s
+      bestTime: 1935, // 32m 15s
+      kakiEarned: 342,
+      categories: {
+        short: 45,
+        medium: 52,
+        long: 30
+      },
+      dailyActivity: [
+        { date: 'Hétfő', sessions: 3, totalTime: 1800, kakiEarned: 9 },
+        { date: 'Kedd', sessions: 4, totalTime: 2400, kakiEarned: 12 },
+        { date: 'Szerda', sessions: 2, totalTime: 1200, kakiEarned: 6 },
+        { date: 'Csütörtök', sessions: 5, totalTime: 3000, kakiEarned: 15 },
+        { date: 'Péntek', sessions: 3, totalTime: 1800, kakiEarned: 9 },
+        { date: 'Szombat', sessions: 6, totalTime: 3600, kakiEarned: 18 },
+        { date: 'Vasárnap', sessions: 4, totalTime: 2400, kakiEarned: 12 }
+      ],
+      recentSessions: [
+        { id: '1', startTime: new Date(), endTime: new Date(), duration: 480, kakiEarned: 2, category: 'medium' },
+        { id: '2', startTime: new Date(), endTime: new Date(), duration: 300, kakiEarned: 1, category: 'short' },
+        { id: '3', startTime: new Date(), endTime: new Date(), duration: 900, kakiEarned: 3, category: 'medium' }
+      ]
+    };
 
     return {
-      totalTime: sessions.reduce((sum, s) => sum + s.duration, 0),
-      totalEarnings: sessions.reduce((sum, s) => sum + s.earnedMoney, 0),
-      averageTime: sessions.reduce((sum, s) => sum + s.duration, 0) / sessions.length,
-      longestSession: Math.max(...sessions.map(s => s.duration)),
-      sessionsThisMonth: thisMonthSessions.length,
-      totalSessions: sessions.length,
+      totalKaki: 498,
+      pvpStats,
+      timerStats,
+      achievements: []
     };
   };
 
-  const getTopSessions = () => {
-    return [...sessions]
-      .sort((a, b) => b.duration - a.duration)
-      .slice(0, 10);
-  };
+  const processTimerStats = (sessionsData: any[]): TimerStats => {
+    const totalSessions = sessionsData.length;
+    const totalTime = sessionsData.reduce((sum, session) => sum + (session.duration || 0), 0);
+    const averageTime = totalSessions > 0 ? totalTime / totalSessions : 0;
+    const bestTime = totalSessions > 0 ? Math.max(...sessionsData.map(s => s.duration || 0)) : 0;
+    const kakiEarned = sessionsData.reduce((sum, session) => sum + (session.kaki_earned || 0), 0);
 
+    // Categorize sessions
+    const categories = {
+      short: sessionsData.filter(s => (s.duration || 0) >= 60 && (s.duration || 0) < 300).length,
+      medium: sessionsData.filter(s => (s.duration || 0) >= 300 && (s.duration || 0) < 900).length,
+      long: sessionsData.filter(s => (s.duration || 0) >= 900).length
+    };
 
-
-  const migrateToOnline = async () => {
-    if (!user || sessions.length === 0) return;
-
-    try {
-      const sessionsToMigrate = sessions.map(session => ({
-        user_id: user.id,
-        start_time: session.startTime.toISOString(),
-        end_time: session.endTime.toISOString(),
-        duration: session.duration,
-        earned_money: session.earnedMoney,
-        salary: 550000, // Default values since we don't have them in localStorage
-        work_hours: 180,
-      }));
-
-      const { error } = await supabase
-        .from('timer_sessions')
-        .insert(sessionsToMigrate);
-
-      if (error) throw error;
-
-      toast({
-        title: "📤 Sikeres átvitel!",
-        description: `${sessions.length} mérés átkerült online fiókodba!`,
-      });
-    } catch (error) {
-      console.error('Error migrating sessions:', error);
-      toast({
-        title: "❌ Átviteli hiba",
-        description: "Nem sikerült az adatok átvitele!",
-      });
-    }
-  };
-
-  const getWeeklyData = () => {
-    const today = new Date();
-    const weekData = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - i));
-      const dayName = date.toLocaleDateString('hu-HU', { weekday: 'short' });
-      
-      const daySessions = sessions.filter(session => {
-        const sessionDate = new Date(session.startTime);
+    // Generate daily activity (last 7 days)
+    const dailyActivity = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const daySessions = sessionsData.filter(s => {
+        const sessionDate = new Date(s.created_at);
         return sessionDate.toDateString() === date.toDateString();
       });
       
-      return {
-        day: dayName,
+      dailyActivity.push({
+        date: date.toLocaleDateString('hu-HU', { weekday: 'short' }),
         sessions: daySessions.length,
-        totalTime: Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60)
-      };
-    });
-    return weekData;
-  };
-
-  const getMonthlyData = () => {
-    const weeks = [];
-    const today = new Date();
-    
-    for (let i = 3; i >= 0; i--) {
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - (i * 7) - 6);
-      const weekEnd = new Date(today);
-      weekEnd.setDate(today.getDate() - (i * 7));
-      
-      const weekSessions = sessions.filter(session => {
-        const sessionDate = new Date(session.startTime);
-        return sessionDate >= weekStart && sessionDate <= weekEnd;
-      });
-      
-      weeks.push({
-        week: `${i === 0 ? 'Ez' : i + 1}. hét`,
-        totalEarnings: Math.round(weekSessions.reduce((sum, s) => sum + s.earnedMoney, 0)),
-        totalTime: Math.round(weekSessions.reduce((sum, s) => sum + s.duration, 0) / 60)
+        totalTime: daySessions.reduce((sum, s) => sum + (s.duration || 0), 0),
+        kakiEarned: daySessions.reduce((sum, s) => sum + (s.kaki_earned || 0), 0)
       });
     }
-    return weeks;
+
+    // Recent sessions
+    const recentSessions = sessionsData.slice(0, 10).map(session => ({
+      id: session.id,
+      startTime: new Date(session.created_at),
+      endTime: new Date(session.created_at),
+      duration: session.duration || 0,
+      kakiEarned: session.kaki_earned || 0,
+      category: ((session.duration || 0) < 300 ? 'short' : (session.duration || 0) < 900 ? 'medium' : 'long') as 'short' | 'medium' | 'long'
+    }));
+
+    return {
+      totalSessions,
+      totalTime,
+      averageTime,
+      bestTime,
+      kakiEarned,
+      categories,
+      dailyActivity,
+      recentSessions
+    };
   };
 
-  const getSessionDistribution = () => {
-    const short = sessions.filter(s => s.duration < 300).length; // < 5 min
-    const medium = sessions.filter(s => s.duration >= 300 && s.duration <= 900).length; // 5-15 min
-    const long = sessions.filter(s => s.duration > 900).length; // > 15 min
+  const processPVPStats = (pvpData: PVPGameData[], userId: string): PVPStats => {
     
-    return [
-      { name: 'Rövid', count: short, key: 'short' },
-      { name: 'Közepes', count: medium, key: 'medium' },
-      { name: 'Hosszú', count: long, key: 'long' }
+    // Include both player and opponent games
+    const userMatches = pvpData.filter(match => 
+      match.player_id === userId || match.opponent_id === userId
+    );
+
+
+    const totalMatches = userMatches.length;
+    const wins = userMatches.filter(match => {
+      if (match.player_id === userId) {
+        return match.player_clicks > match.opponent_clicks;
+      } else {
+        return match.opponent_clicks > match.player_clicks;
+      }
+    }).length;
+    
+    const losses = totalMatches - wins;
+    const winRate = totalMatches > 0 ? (wins / totalMatches) * 100 : 0;
+
+    // Calculate CPS stats
+    const userClicks = userMatches.map(match => {
+      if (match.player_id === userId) {
+        return match.player_clicks;
+      } else {
+        return match.opponent_clicks;
+      }
+    });
+
+    const bestCPS = userClicks.length > 0 ? Math.max(...userClicks.map(clicks => clicks / 8)) : 0;
+    const averageCPS = userClicks.length > 0 ? userClicks.reduce((sum, clicks) => sum + (clicks / 8), 0) / userClicks.length : 0;
+    const bestClickRecord = userClicks.length > 0 ? Math.max(...userClicks) : 0;
+
+    // Calculate kaki stats
+    const kakiEarned = wins * 3;
+    const kakiLost = losses * 1;
+
+    // Weekly stats (simplified)
+    const weeklyStats = [
+      { week: '1. hét', matches: Math.floor(totalMatches * 0.25), wins: Math.floor(wins * 0.25), averageCPS: averageCPS * 0.9, kakiEarned: Math.floor(kakiEarned * 0.25) },
+      { week: '2. hét', matches: Math.floor(totalMatches * 0.3), wins: Math.floor(wins * 0.3), averageCPS: averageCPS * 0.95, kakiEarned: Math.floor(kakiEarned * 0.3) },
+      { week: '3. hét', matches: Math.floor(totalMatches * 0.25), wins: Math.floor(wins * 0.25), averageCPS: averageCPS, kakiEarned: Math.floor(kakiEarned * 0.25) },
+      { week: '4. hét', matches: Math.floor(totalMatches * 0.2), wins: Math.floor(wins * 0.2), averageCPS: averageCPS * 1.05, kakiEarned: Math.floor(kakiEarned * 0.2) }
     ];
+
+    // Recent matches
+    const recentMatches = userMatches.slice(0, 5).map(match => ({
+      id: match.id,
+      opponent: match.player_id === userId ? match.opponent_username || 'Unknown' : match.player_username || 'Unknown',
+      result: ((match.player_id === userId && match.player_clicks > match.opponent_clicks) || 
+              (match.opponent_id === userId && match.opponent_clicks > match.player_clicks) ? 'win' : 'loss') as 'win' | 'loss',
+      clicks: match.player_id === userId ? match.player_clicks : match.opponent_clicks,
+      cps: (match.player_id === userId ? match.player_clicks : match.opponent_clicks) / 8,
+      kakiChange: (match.player_id === userId && match.player_clicks > match.opponent_clicks) || 
+                 (match.opponent_id === userId && match.opponent_clicks > match.player_clicks) ? 3 : -1,
+      date: new Date(match.created_at)
+    }));
+
+
+
+    return {
+      totalMatches,
+      wins,
+      losses,
+      winRate,
+      bestCPS,
+      averageCPS,
+      bestClickRecord,
+      kakiEarned,
+      kakiLost,
+      weeklyStats,
+      recentMatches
+    };
   };
 
-  const stats = getStats();
-  const topSessions = getTopSessions().slice(0, 3);
+  const demoStats = generateDemoStats();
+  const currentStats = stats || demoStats;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full h-full max-w-none max-h-none m-0 p-0 overflow-y-auto bg-background"
-        style={{
-          width: '100vw',
-          height: '100vh',
-          maxWidth: 'none',
-          maxHeight: 'none',
-          margin: 0,
-          borderRadius: 0
-        }}>
-        <div className="flex flex-col h-full">
-          <div className="p-4 pb-2">
-            <DialogHeader>
-              <DialogTitle className="text-center text-xl flex items-center justify-center gap-2">
-                📊 Statisztikák
-              </DialogTitle>
-            </DialogHeader>
-          </div>
-
-          <Tabs defaultValue="overview" className="flex-1 flex flex-col">
-                      <TabsList className="grid w-full grid-cols-4 mx-4 mb-2">
-            <TabsTrigger value="overview">Áttekintés</TabsTrigger>
-            <TabsTrigger value="leaderboard">Saját Best Of</TabsTrigger>
-            <TabsTrigger value="online">Online</TabsTrigger>
-            <TabsTrigger value="pvp">PVP</TabsTrigger>
-          </TabsList>
-            
-            <TabsContent value="overview" className="flex-1 space-y-3 px-4 pb-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="p-3 text-center border-2">
-                <div className="text-xl">🏆</div>
-                <div className="text-base font-bold text-primary">
-                  {formatTime(stats.longestSession)}
-                </div>
-                <div className="text-xs text-muted-foreground">Rekord idő</div>
-              </Card>
-
-              <Card className="p-3 text-center border-2">
-                <div className="text-xl">💰</div>
-                <div className="text-base font-bold text-success">
-                  {formatMoney(stats.totalEarnings)} Ft
-                </div>
-                <div className="text-xs text-muted-foreground">Össz kereset</div>
-              </Card>
-
-              <Card className="p-3 text-center border-2">
-                <div className="text-xl">⏱️</div>
-                <div className="text-base font-bold text-warning">
-                  {formatTime(stats.totalTime)}
-                </div>
-                <div className="text-xs text-muted-foreground">Össz idő</div>
-              </Card>
-
-              <Card className="p-3 text-center border-2">
-                <div className="text-xl">📅</div>
-                <div className="text-base font-bold text-accent-foreground">
-                  {stats.sessionsThisMonth}
-                </div>
-                <div className="text-xs text-muted-foreground">Ebben a hónapban</div>
-              </Card>
-            </div>
-
-            <Card className="p-3 border-2">
-              <button 
-                className="w-full space-y-2 cursor-pointer hover:bg-accent/50 transition-colors p-2 rounded-md"
-                onClick={() => setShowDetailedCharts(!showDetailedCharts)}
-              >
-                <h3 className="font-semibold text-center text-sm">📈 További adatok {showDetailedCharts ? '▼' : '▶'}</h3>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Átlag idő:</span>
-                    <div className="font-semibold">{formatTime(stats.averageTime)}</div>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Össz alkalom:</span>
-                    <div className="font-semibold">{stats.totalSessions} db</div>
-                  </div>
-                </div>
-              </button>
-            </Card>
-
-            {showDetailedCharts && sessions.length > 0 && (
-              <div className="space-y-6">
-                {/* Heti teljesítmény grafikon */}
-                <Card className="p-3 border-2">
-                  <h4 className="font-semibold text-center mb-3 text-sm">📊 Heti teljesítmény</h4>
-                  <ChartContainer
-                    config={{
-                      sessions: {
-                        label: "Alkalmak",
-                        color: "hsl(var(--primary))",
-                      },
-                      time: {
-                        label: "Idő (perc)",
-                        color: "hsl(var(--success))",
-                      },
-                    }}
-                    className="h-[150px]"
-                  >
-                    <BarChart data={getWeeklyData()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="sessions" fill="var(--color-sessions)" />
-                    </BarChart>
-                  </ChartContainer>
-                </Card>
-
-                {/* Havi trend grafikon */}
-                <Card className="p-3 border-2">
-                  <h4 className="font-semibold text-center mb-3 text-sm">📈 Havi trend</h4>
-                  <ChartContainer
-                    config={{
-                      earnings: {
-                        label: "Kereset (Ft)",
-                        color: "hsl(var(--warning))",
-                      },
-                      time: {
-                        label: "Idő (perc)",
-                        color: "hsl(var(--success))",
-                      },
-                    }}
-                    className="h-[150px]"
-                  >
-                    <LineChart data={getMonthlyData()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="totalEarnings" 
-                        stroke="var(--color-earnings)" 
-                        strokeWidth={3}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="totalTime" 
-                        stroke="var(--color-time)" 
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                </Card>
-
-                {/* Teljesítmény kördiagram */}
-                <Card className="p-3 border-2">
-                  <h4 className="font-semibold text-center mb-3 text-sm">🎯 Időszakok megoszlása</h4>
-                  <ChartContainer
-                    config={{
-                      short: {
-                        label: "Rövid (< 5 perc)",
-                        color: "hsl(var(--destructive))",
-                      },
-                      medium: {
-                        label: "Közepes (5-15 perc)",
-                        color: "hsl(var(--warning))",
-                      },
-                      long: {
-                        label: "Hosszú (> 15 perc)",
-                        color: "hsl(var(--success))",
-                      },
-                    }}
-                    className="h-[200px]"
-                  >
-                    <PieChart>
-                      <Pie
-                        data={getSessionDistribution()}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="count"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {getSessionDistribution().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`var(--color-${entry.key})`} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ChartContainer>
-                </Card>
-              </div>
-            )}
-
-            
-
-          </TabsContent>
-
-          <TabsContent value="leaderboard" className="flex-1 space-y-3 px-4 pb-4">
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-primary mb-3">
-                🏆 Saját Best Of - Top 3
-              </h3>
-            </div>
-
-            {topSessions.length === 0 ? (
-              <Card className="p-6 text-center border-2">
-                <div className="text-3xl mb-2">🚽</div>
-                <div className="text-muted-foreground text-sm">
-                  Még nincs mért időd!<br />
-                  Indítsd el az első mérést! 😄
-                </div>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {topSessions.map((session, index) => (
-                  <Card key={session.id} className="p-3 border-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="text-xl">
-                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
-                        </div>
-                        <div>
-                          <div className="font-bold text-primary text-sm">
-                            {formatTime(session.duration)}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {session.username ? `${session.username} • ${formatDate(session.startTime)}` : formatDate(session.startTime)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-success text-sm">
-                          +{formatMoney(session.earnedMoney)} Ft
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="online" className="flex-1 space-y-3 px-4 pb-4">
-            <OnlineLeaderboardContent />
-          </TabsContent>
-
-          <TabsContent value="pvp" className="flex-1 space-y-3 px-4 pb-4">
-            <PVPStatisticsContent user={user} />
-          </TabsContent>
-        </Tabs>
+      <DialogContent className="max-w-6xl mx-auto p-2 sm:p-4 max-h-[95vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0 pt-2 pb-1">
+          <DialogTitle className="text-center text-lg sm:text-2xl flex items-center justify-center gap-2">
+            📊 Statisztikák
+          </DialogTitle>
+        </DialogHeader>
         
-        <div className="p-4 pt-2 border-t">
-          <Button onClick={onClose} variant="outline" size="lg" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'pvp' | 'timer')} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-3 flex-shrink-0 text-xs sm:text-sm">
+            <TabsTrigger value="overview" className="flex items-center gap-1 sm:gap-2">
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Áttekintés</span>
+              <span className="sm:hidden">Áttekintés</span>
+            </TabsTrigger>
+            <TabsTrigger value="pvp" className="flex items-center gap-1 sm:gap-2">
+              <Sword className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">PVP Harc</span>
+              <span className="sm:hidden">PVP</span>
+            </TabsTrigger>
+            <TabsTrigger value="timer" className="flex items-center gap-1 sm:gap-2">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Kakilás</span>
+              <span className="sm:hidden">Timer</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div ref={swipeRef} className="flex-1 overflow-y-auto min-h-0 pb-2">
+            <TabsContent value="overview" className="h-full min-h-[500px] mt-2">
+              <OverviewDashboard stats={currentStats} />
+            </TabsContent>
+
+            <TabsContent value="pvp" className="space-y-3 px-2 sm:px-4 pb-2 min-h-[500px] mt-2">
+              <PVPDashboard stats={currentStats.pvpStats} />
+            </TabsContent>
+
+            <TabsContent value="timer" className="space-y-3 px-2 sm:px-4 pb-2 min-h-[500px] mt-2">
+              <TimerDashboard stats={currentStats.timerStats} />
+            </TabsContent>
+          </div>
+          
+          {/* Swipe Indicator for Statistics - minimális távolság a gombtól */}
+          <div className="flex-shrink-0 px-2 pb-1">
+            <SwipeIndicator 
+              currentIndex={tabOrder.indexOf(activeTab)}
+              totalItems={tabOrder.length}
+              labels={['Áttekintés', 'PVP Harc', 'Kakilás']}
+            />
+          </div>
+        </Tabs>
+
+        {/* Fixed bottom button - vastagabb és biztonságos pozíció */}
+        <div className="flex-shrink-0 pb-1">
+          <Button
+            onClick={onClose}
+            variant="outline"
+            className="w-full h-12 text-base"
+          >
             <X className="w-5 h-5 mr-2" />
             Bezárás
           </Button>
         </div>
-      </div>
       </DialogContent>
     </Dialog>
   );

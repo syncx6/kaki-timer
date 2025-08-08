@@ -2,18 +2,29 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://wkcfpeurietbcbklcwxc.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrY2ZwZXVyaWV0YmNia2xjd3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2NjY5NjYsImV4cCI6MjA2ODI0Mjk2Nn0.R1_yhId_51Trxn2mKtL1aLt2TP6wcU6AfQ_2XYjRVu4";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
     detectSessionInUrl: false,
     flowType: 'pkce'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
+
+// Realtime channels for PVP
+export const pvpChannel = supabase.channel('pvp-games');
+export const chatChannel = supabase.channel('chat-messages');
+export const notificationsChannel = supabase.channel('notifications');

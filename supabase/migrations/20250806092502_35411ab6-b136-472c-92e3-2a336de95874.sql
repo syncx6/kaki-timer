@@ -70,6 +70,15 @@ FOR SELECT
 TO authenticated
 USING (true);
 
+-- Create function for automatic timestamp updates
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- Add trigger for automatic timestamp updates
 CREATE TRIGGER update_profiles_updated_at
 BEFORE UPDATE ON public.profiles

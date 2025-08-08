@@ -29,23 +29,10 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
   };
 
   const handleSignUp = async () => {
-    // Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    if (!formData.email || !emailRegex.test(formData.email)) {
-      toast({
-        title: "❌ Helytelen e-mail formátum",
-        description: "Kérlek adj meg egy érvényes e-mail címet!",
-        className: "fixed bottom-4 right-4 z-50",
-        duration: 1000,
-      });
-      return;
-    }
-
-    if (!formData.username || !formData.password) {
+    if (!formData.email || !formData.password || !formData.username) {
       toast({
         title: "❌ Hiányzó adatok",
-        description: "Felhasználónév és jelszó szükséges!",
+        description: "Minden mező kitöltése kötelező!",
         className: "fixed bottom-4 right-4 z-50",
         duration: 1000,
       });
@@ -54,155 +41,41 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
 
     setIsLoading(true);
     try {
-      // Check if username already exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('username', formData.username)
-        .maybeSingle();
-
-      if (existingProfile) {
-        toast({
-          title: "❌ Foglalt felhasználónév",
-          description: "Ez a felhasználónév már foglalt!",
-          className: "fixed bottom-4 right-4 z-50",
-          duration: 1000,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // For development, try to create user without email confirmation
-      // This will work if email confirmations are disabled in Supabase Dashboard
+      // Use Supabase for registration
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
             username: formData.username,
-          }
-        }
+          },
+        },
       });
-
-      console.log('Signup result:', { data, error });
-
-      if (error) {
-        // If signup fails due to email confirmation, try to sign in directly
-        console.log('Signup failed, trying direct sign in...');
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (signInError) {
-          throw error; // Throw original signup error
-        }
-
-        // Create profile for existing user
-        if (signInData.user) {
-          try {
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .insert([
-                {
-                  user_id: signInData.user.id,
-                  username: formData.username
-                }
-              ]);
-
-            if (profileError) {
-              console.warn('Profile creation warning:', profileError);
-            }
-          } catch (profileError) {
-            console.warn('Profile creation warning:', profileError);
-          }
-
-          toast({
-            title: "🎉 Bejelentkezés sikeres!",
-            description: "Üdv a WC Timer online világában!",
-            className: "fixed bottom-4 right-4 z-50",
-            duration: 2000,
-          });
-
-          onAuthSuccess();
-          return;
-        }
-      }
 
       if (error) throw error;
 
-      console.log('Registration result:', data);
-
       if (data.user) {
-        // Create profile with username - wrapped in try-catch to handle RLS issues
-        try {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                user_id: data.user.id,
-                username: formData.username
-                // kaki_count will be added by default if column exists
-              }
-            ]);
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              user_id: data.user.id,
+              username: formData.username,
+              kaki_count: 0
+            }
+          ]);
 
-          if (profileError) {
-            console.warn('Profile creation warning:', profileError);
-            // Continue anyway as the user account was created successfully
-          }
-        } catch (profileError) {
-          console.warn('Profile creation warning:', profileError);
-          // Continue anyway as the user account was created successfully
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
         }
 
-        // Check if user needs email confirmation
-        if (data.user.email_confirmed_at) {
-          // User is already confirmed, sign in immediately
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password,
-          });
-
-          if (signInError) {
-            console.error('Auto sign-in error:', signInError);
-            toast({
-              title: "⚠️ Regisztráció sikeres, de bejelentkezés sikertelen",
-              description: "Kérlek jelentkezz be manuálisan!",
-              className: "fixed bottom-4 right-4 z-50",
-              duration: 3000,
-            });
-          } else {
-            toast({
-              title: "🎉 Regisztráció és bejelentkezés sikeres!",
-              description: "Üdv a WC Timer online világában!",
-              className: "fixed bottom-4 right-4 z-50",
-              duration: 2000,
-            });
-          }
-        } else {
-          // User needs email confirmation - but we'll try to sign in anyway
-          console.log('User needs email confirmation, trying to sign in anyway...');
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password,
-          });
-
-          if (signInError) {
-            toast({
-              title: "📧 Email megerősítés szükséges",
-              description: "Kérlek ellenőrizd az email fiókod és kattints a linkre!",
-              className: "fixed bottom-4 right-4 z-50",
-              duration: 5000,
-            });
-          } else {
-            toast({
-              title: "🎉 Regisztráció és bejelentkezés sikeres!",
-              description: "Üdv a WC Timer online világában!",
-              className: "fixed bottom-4 right-4 z-50",
-              duration: 2000,
-            });
-          }
-        }
+        toast({
+          title: "🎉 Regisztráció sikeres!",
+          description: "Üdv a WC Timer online világában!",
+          className: "fixed bottom-4 right-4 z-50",
+          duration: 2000,
+        });
         
         // Update username in localStorage immediately after successful registration
         localStorage.setItem('wc-timer-username', formData.username);
@@ -235,6 +108,7 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
 
     setIsLoading(true);
     try {
+      // Use Supabase for authentication
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -411,8 +285,8 @@ export function Auth({ open, onClose, onAuthSuccess }: AuthProps) {
           </TabsContent>
         </Tabs>
 
-        <div className="pt-4">
-          <Button onClick={onClose} variant="outline" size="lg" className="w-full">
+        <div className="pt-2 pb-1">
+          <Button onClick={onClose} variant="outline" className="w-full h-12 text-base">
             <X className="w-5 h-5 mr-2" />
             Mégse
           </Button>

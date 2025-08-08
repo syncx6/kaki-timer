@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Settings, BarChart3, Trophy, Award, Cog } from 'lucide-react';
-import { Statistics } from '@/components/Statistics';
+import { User, Settings, Trophy, Award, Cog } from 'lucide-react';
 import { Settings as SettingsComponent } from '@/components/Settings';
+import { Achievements } from '@/components/Achievements';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface ProfilePageProps {
@@ -30,25 +30,17 @@ export function ProfilePage({
   onLogout,
   onSaveSettings 
 }: ProfilePageProps) {
-  const [showStats, setShowStats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
 
   const profileFeatures = [
-    {
-      id: 'stats',
-      title: 'Statisztikák',
-      description: 'Nézd meg a részletes statisztikáidat',
-      icon: BarChart3,
-      color: 'bg-blue-500',
-      status: 'available'
-    },
     {
       id: 'achievements',
       title: 'Achievementek',
       description: 'Nézd meg az elért eredményeidet',
       icon: Trophy,
       color: 'bg-yellow-500',
-      status: 'coming-soon'
+      status: 'available'
     },
     {
       id: 'rewards',
@@ -62,8 +54,8 @@ export function ProfilePage({
 
   const handleFeatureClick = (featureId: string) => {
     switch (featureId) {
-      case 'stats':
-        setShowStats(true);
+      case 'achievements':
+        setShowAchievements(true);
         break;
       default:
         // Coming soon features
@@ -73,6 +65,17 @@ export function ProfilePage({
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold flex items-center justify-center gap-2">
+          <User className="w-8 h-8" />
+          Profil
+        </h1>
+        <p className="text-muted-foreground">
+          Kezelje fiókját, beállításait és eredményeit
+        </p>
+      </div>
+
       {/* Profile Header */}
       <Card 
         className={`p-6 border-2 ${user ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200' : ''}`}
@@ -185,13 +188,7 @@ export function ProfilePage({
         </Card>
       )}
 
-      {/* Dialogs */}
-      <Statistics
-        open={showStats}
-        onClose={() => setShowStats(false)}
-        user={user}
-      />
-      
+      {/* Settings Dialog */}
       <SettingsComponent
         open={showSettings}
         onClose={() => setShowSettings(false)}
@@ -201,6 +198,13 @@ export function ProfilePage({
         onSave={onSaveSettings}
         onOpenAuth={onOpenAuth}
         isOnline={!!user}
+        user={user}
+      />
+
+      {/* Achievements Dialog */}
+      <Achievements
+        open={showAchievements}
+        onClose={() => setShowAchievements(false)}
         user={user}
       />
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,46 @@ interface GamesPageProps {
 
 export function GamesPage({ user, username, onKakiUpdate }: GamesPageProps) {
   const [showPVPGame, setShowPVPGame] = useState(false);
+  const [gameStats, setGameStats] = useState({ totalMatches: 0, winRate: 0 });
+
+  // Load PVP stats from localStorage
+  const loadGameStats = () => {
+    if (user) {
+      try {
+        const localStorageGames = JSON.parse(localStorage.getItem('wc-timer-pvp-games') || '[]');
+        const userGames = localStorageGames.filter((game: any) => 
+          game.player_id === user.id || game.opponent_id === user.id
+        );
+        
+        const totalMatches = userGames.length;
+        let wins = 0;
+        
+        userGames.forEach((game: any) => {
+          if (game.player_id === user.id) {
+            if (game.player_clicks > game.opponent_clicks) wins++;
+          } else {
+            if (game.opponent_clicks > game.player_clicks) wins++;
+          }
+        });
+        
+        const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+        
+        setGameStats({ totalMatches, winRate });
+      } catch (error) {
+        console.error('Error loading game stats:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadGameStats();
+  }, [user]);
+
+  // Refresh stats when PVP game closes
+  const handlePVPClose = () => {
+    setShowPVPGame(false);
+    loadGameStats(); // Refresh stats after game
+  };
 
   const gameModes = [
     {
@@ -130,11 +170,11 @@ export function GamesPage({ user, username, onKakiUpdate }: GamesPageProps) {
           </h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">0</div>
+              <div className="text-2xl font-bold text-primary">{gameStats.totalMatches}</div>
               <div className="text-muted-foreground">Játszott meccs</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-success">0%</div>
+              <div className="text-2xl font-bold text-success">{gameStats.winRate}%</div>
               <div className="text-muted-foreground">Győzelmi arány</div>
             </div>
           </div>
@@ -144,7 +184,7 @@ export function GamesPage({ user, username, onKakiUpdate }: GamesPageProps) {
       {/* PVP Game Dialog */}
       <PVPGame
         open={showPVPGame}
-        onClose={() => setShowPVPGame(false)}
+        onClose={handlePVPClose}
         user={user}
         username={username}
         onKakiUpdate={onKakiUpdate}

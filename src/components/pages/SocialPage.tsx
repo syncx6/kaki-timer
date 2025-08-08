@@ -2,24 +2,43 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Trophy, Crown, TrendingUp, UserPlus, MessageCircle } from 'lucide-react';
-import { OnlineLeaderboard } from '@/components/OnlineLeaderboard';
+import { Users, Trophy, Crown, TrendingUp, UserPlus, BarChart3 } from 'lucide-react';
+import { PVPLeaderboard } from '@/components/PVPLeaderboard';
+import { KakiLeaderboard } from '@/components/KakiLeaderboard';
+import { Statistics } from '@/components/Statistics';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface SocialPageProps {
   user: SupabaseUser | null;
-  onOpenOnlineLeaderboard: () => void;
 }
 
-export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
-  const [showOnlineLeaderboard, setShowOnlineLeaderboard] = useState(false);
+export function SocialPage({ user }: SocialPageProps) {
+  const [showStats, setShowStats] = useState(false);
+  const [showPVPLeaderboard, setShowPVPLeaderboard] = useState(false);
+  const [showKakiLeaderboard, setShowKakiLeaderboard] = useState(false);
 
   const socialFeatures = [
     {
-      id: 'leaderboard',
-      title: 'Toplista',
-      description: 'Nézd meg a legjobb játékosokat',
+      id: 'stats',
+      title: 'Statisztikák',
+      description: 'Nézd meg a részletes statisztikáidat',
+      icon: BarChart3,
+      color: 'bg-blue-500',
+      status: 'available'
+    },
+    {
+      id: 'pvp-leaderboard',
+      title: 'PVP Ranglista',
+      description: 'A legjobb PVP játékosok',
       icon: Trophy,
+      color: 'bg-red-500',
+      status: 'available'
+    },
+    {
+      id: 'kaki-leaderboard',
+      title: 'Kaki Ranglista',
+      description: 'A legtöbb kaki gyűjtő',
+      icon: Crown,
       color: 'bg-yellow-500',
       status: 'available'
     },
@@ -32,17 +51,9 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
       status: 'coming-soon'
     },
     {
-      id: 'chat',
-      title: 'Chat',
-      description: 'Beszélgess más játékosokkal',
-      icon: MessageCircle,
-      color: 'bg-green-500',
-      status: 'coming-soon'
-    },
-    {
-      id: 'guilds',
-      title: 'Csapatok',
-      description: 'Csatlakozz vagy hozz létre csapatot',
+      id: 'clans',
+      title: 'Klánok',
+      description: 'Csatlakozz vagy hozz létre klánt',
       icon: Users,
       color: 'bg-purple-500',
       status: 'coming-soon'
@@ -51,8 +62,14 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
 
   const handleFeatureClick = (featureId: string) => {
     switch (featureId) {
-      case 'leaderboard':
-        setShowOnlineLeaderboard(true);
+      case 'stats':
+        setShowStats(true);
+        break;
+      case 'pvp-leaderboard':
+        setShowPVPLeaderboard(true);
+        break;
+      case 'kaki-leaderboard':
+        setShowKakiLeaderboard(true);
         break;
       default:
         // Coming soon features
@@ -130,11 +147,23 @@ export function SocialPage({ user, onOpenOnlineLeaderboard }: SocialPageProps) {
         </div>
       </Card>
 
-      {/* Online Leaderboard Dialog */}
-      <OnlineLeaderboard
-        open={showOnlineLeaderboard}
-        onClose={() => setShowOnlineLeaderboard(false)}
+      {/* PVP Leaderboard Dialog */}
+      <PVPLeaderboard
+        open={showPVPLeaderboard}
+        onClose={() => setShowPVPLeaderboard(false)}
+      />
+
+      {/* Statistics Dialog */}
+      <Statistics
+        open={showStats}
+        onClose={() => setShowStats(false)}
         user={user}
+      />
+
+      {/* Kaki Leaderboard Dialog */}
+      <KakiLeaderboard
+        open={showKakiLeaderboard}
+        onClose={() => setShowKakiLeaderboard(false)}
       />
     </div>
   );

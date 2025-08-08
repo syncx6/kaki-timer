@@ -121,7 +121,7 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md mx-auto p-4 flex flex-col h-[90vh]">
+      <DialogContent className="max-w-md mx-auto p-4 flex flex-col h-[90vh] pt-8">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             ⚙️ Beállítások
@@ -142,6 +142,7 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
                   onChange={(e) => setNewUsername(e.target.value)}
                   placeholder="Adja meg a felhasználónevet"
                   className="text-lg"
+                  autoFocus={false}
                 />
                 <p className="text-xs text-muted-foreground">
                   Ez a név megjelenik a statisztikákban és a jobb felső sarokban
@@ -238,13 +239,12 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
         </div>
 
         {/* Fixed bottom buttons */}
-        <div className="flex-shrink-0 pt-4 space-y-4">
-          <div className="flex gap-4">
+        <div className="flex-shrink-0 pt-2 pb-1 space-y-2">
+          <div className="flex gap-2">
             <Button
               onClick={onClose}
               variant="outline"
-              size="lg"
-              className="flex-1"
+              className="flex-1 h-12 text-base"
             >
               <X className="w-5 h-5 mr-2" />
               Mégse
@@ -253,18 +253,14 @@ export function Settings({ open, onClose, salary, workHours, username, onSave, o
             <Button
               onClick={handleSave}
               variant="default"
-              size="lg"
-              className="flex-1"
+              className="flex-1 h-12 text-base"
             >
               <Save className="w-5 h-5 mr-2" />
               Mentés
             </Button>
           </div>
 
-          <div className="text-xs text-center text-muted-foreground space-y-1">
-            <p>💡 Tipp: Állítsd be a pontos adatokat,</p>
-            <p>hogy lásd mennyit kerestel kakálás közben! 😄</p>
-          </div>
+
         </div>
       </DialogContent>
 
