@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Play, Square, Clock, DollarSign, Trophy, TrendingUp, Sword, Target, Zap, BarChart3 } from 'lucide-react';
+import { Play, Square, Clock, DollarSign, Trophy, TrendingUp, Sword, Target, Zap, BarChart3, Gift, Flame, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useDailyFeatures } from '@/hooks/use-daily-features';
 import { supabase } from '@/integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -43,6 +44,7 @@ interface HomePageProps {
   onKakiUpdate?: (change: number) => void;
   onNavigateToGames?: () => void;
   onOpenPVPGame?: () => void;
+  onPVPStatsRefresh?: () => void;
 }
 
 export function HomePage({ 
@@ -63,25 +65,73 @@ export function HomePage({
   onLogout,
   onKakiUpdate,
   onNavigateToGames,
-  onOpenPVPGame
+  onOpenPVPGame,
+  onPVPStatsRefresh
 }: HomePageProps) {
   const [sessions, setSessions] = useState<TimerSession[]>([]);
   const [showProgressCheck, setShowProgressCheck] = useState(false);
   const [lastProgressCheck, setLastProgressCheck] = useState<Date | null>(null);
   const { toast } = useToast();
+  
+  // Daily features hook
+  const { dailyStats, openDailyGift, incrementDailyTimerSessions, updatePVPStats, refreshStats } = useDailyFeatures(user);
 
-  // Load sessions from localStorage
+  // Set up global refresh function for PVP stats
   useEffect(() => {
-    const saved = localStorage.getItem('wc-timer-sessions');
-    if (saved) {
-      const parsed = JSON.parse(saved).map((s: any) => ({
-        ...s,
-        startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
-      }));
-      setSessions(parsed);
-    }
-  }, []);
+    (window as any).refreshHomePageStats = () => {
+      console.log('Refreshing HomePage PVP stats...');
+      refreshStats();
+    };
+
+    // Cleanup on unmount
+    return () => {
+      delete (window as any).refreshHomePageStats;
+    };
+  }, [refreshStats]);
+
+  // Load sessions from Supabase for the current user only
+  useEffect(() => {
+    const fetchUserSessions = async () => {
+      if (!user) {
+        setSessions([]);
+        return;
+      }
+
+      try {
+        const { data: sessionsData, error } = await supabase
+          .from('timer_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching user sessions:', error);
+          setSessions([]);
+          return;
+        }
+
+        if (sessionsData && sessionsData.length > 0) {
+          const parsed = sessionsData.map((s: any) => ({
+            id: s.id,
+            startTime: new Date(s.start_time),
+            endTime: new Date(s.end_time),
+            duration: s.duration,
+            earnedMoney: s.earned_money || 0,
+            kaki_earned: s.kaki_earned || 0,
+            username: s.user_id
+          }));
+          setSessions(parsed);
+        } else {
+          setSessions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching sessions:', error);
+        setSessions([]);
+      }
+    };
+
+    fetchUserSessions();
+  }, [user]);
 
   const handleStartTimer = () => {
     if (!user) {
@@ -89,10 +139,55 @@ export function HomePage({
       return;
     }
     onStartTimer();
+    // Increment daily timer sessions counter
+    incrementDailyTimerSessions();
   };
 
   const handleStopTimer = () => {
     onStopTimer();
+  };
+
+  // Get dynamic border colors based on stats
+  const getDailySessionsBorderColor = () => {
+    const sessions = dailyStats.dailyTimerSessions;
+    if (sessions === 0) return 'border-red-400';
+    if (sessions === 1) return 'border-orange-400';
+    return 'border-green-400';
+  };
+
+  const getPVPWinRateBorderColor = () => {
+    const winRate = dailyStats.pvpWinRate;
+    if (winRate >= 80) return 'border-green-400';
+    if (winRate >= 50) return 'border-orange-400';
+    return 'border-red-400';
+  };
+
+  const getGiftBoxBorderColor = () => {
+    if (!dailyStats.canOpenGift) return 'border-red-400'; // Már kinyitva - piros
+    return 'border-green-400 animate-slow-pulse'; // Elérhető - zöld pulzálás
+  };
+
+  // Handle daily gift opening
+  const handleOpenGift = async () => {
+    const result = await openDailyGift();
+    if (result.success) {
+      toast({
+        title: "🎁 Ajándék kinyitva!",
+        description: result.message,
+        duration: 3000,
+      });
+      // Update parent component's kaki count if needed
+      if (onKakiUpdate) {
+        onKakiUpdate(result.kakiAmount);
+      }
+    } else {
+      toast({
+        title: "❌ Hiba",
+        description: result.message,
+        variant: "destructive",
+        duration: 2000,
+      });
+    }
   };
 
   const formatTime = (totalSeconds: number) => {
@@ -263,38 +358,35 @@ export function HomePage({
         )}
       </div>
 
-      {/* Action-Oriented Quick Stats */}
+      {/* Personal Dashboard Cards */}
       <div className="grid grid-cols-1 gap-4">
-        {/* Next Goal Card */}
-        <Card 
-          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
-          onClick={handleStartTimer}
-        >
+        {/* Daily Timer Sessions Card */}
+        <Card className={`p-4 border-2 hover:shadow-lg transition-shadow ${getDailySessionsBorderColor()}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Target className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-6 h-6 text-amber-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-lg font-semibold truncate">🎯 Következő Cél</div>
-                <div className="text-xl sm:text-2xl font-bold text-blue-600 truncate">
-                  {formatTime(nextGoal)}
+                <div className="text-lg font-semibold truncate">💩 Napi Kaki Számláló</div>
+                <div className="text-xl sm:text-2xl font-bold text-amber-600 truncate">
+                  {dailyStats.dailyTimerSessions} kaki
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Rekord: {getRecord() ? formatTime(getRecord()!) : '--:--'}
+                  Ma hányszor indítottam el a timert
                 </div>
               </div>
             </div>
             <div className="text-right flex-shrink-0 ml-2">
-              <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
-              <div className="text-xs text-blue-600">Új időmérés</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">Mai</div>
+              <div className="text-xs text-amber-600">Sessions</div>
             </div>
           </div>
         </Card>
 
-        {/* PVP Challenge Card */}
+        {/* PVP Win Rate Card */}
         <Card 
-          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
+          className={`p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95 ${getPVPWinRateBorderColor()}`}
           onClick={() => {
             if (!user) {
               onOpenAuth();
@@ -311,45 +403,97 @@ export function HomePage({
                 <Sword className="w-6 h-6 text-red-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-lg font-semibold truncate">⚔️ PVP Kihívás</div>
+                <div className="text-lg font-semibold truncate">⚔️ PVP Win Rate</div>
                 <div className="text-xl sm:text-2xl font-bold text-red-600 truncate">
-                  {pvpStats.wins}/{pvpStats.total}
+                  {dailyStats.pvpWinRate}%
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Win rate: {pvpStats.winRate}%
+                  {dailyStats.pvpWins}/{dailyStats.pvpTotal} győzelem (all-time)
                 </div>
               </div>
             </div>
             <div className="text-right flex-shrink-0 ml-2">
               <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
-              <div className="text-xs text-red-600">CPU Harc</div>
+              <div className="text-xs text-red-600">PVP Harc</div>
             </div>
           </div>
         </Card>
 
-        {/* Daily Performance Card */}
+        {/* Daily Gift Box Card */}
         <Card 
-          className="p-4 border-2 cursor-pointer hover:shadow-lg transition-shadow active:scale-95"
-          onClick={onOpenStats}
+          className={`p-4 border-2 transition-shadow ${getGiftBoxBorderColor()} ${
+            dailyStats.canOpenGift 
+              ? 'cursor-pointer hover:shadow-lg active:scale-95 bg-gradient-to-r from-purple-50 to-pink-50' 
+              : 'cursor-not-allowed bg-gray-50'
+          }`}
+          onClick={dailyStats.canOpenGift ? handleOpenGift : undefined}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="w-6 h-6 text-yellow-600" />
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                dailyStats.canOpenGift 
+                  ? 'bg-purple-100 animate-pulse' 
+                  : 'bg-gray-100'
+              }`}>
+                <Gift className={`w-6 h-6 ${
+                  dailyStats.canOpenGift 
+                    ? 'text-purple-600' 
+                    : 'text-gray-400'
+                }`} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-lg font-semibold truncate">🏆 Napi Teljesítmény</div>
-                <div className="text-xl sm:text-2xl font-bold text-yellow-600 truncate">
-                  +{dailyPerformance.today}
+                <div className="text-lg font-semibold truncate">
+                  🎁 {dailyStats.canOpenGift ? 'Napi Ajándék' : 'Ajándék Kinyitva'}
+                </div>
+                <div className={`text-xl sm:text-2xl font-bold truncate ${
+                  dailyStats.canOpenGift 
+                    ? 'text-purple-600' 
+                    : 'text-gray-400'
+                }`}>
+                  {dailyStats.canOpenGift ? '1-25 kaki' : 'Holnap újra!'}
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Ma: +{dailyPerformance.today}, Tegnap: +{dailyPerformance.yesterday}
+                  {dailyStats.canOpenGift 
+                    ? 'Kattints a kinyitáshoz!' 
+                    : 'Holnap 00:00-kor újra'}
                 </div>
               </div>
             </div>
             <div className="text-right flex-shrink-0 ml-2">
-              <div className="text-xs sm:text-sm text-muted-foreground">Kattints</div>
-              <div className="text-xs text-yellow-600">Statisztikák</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">
+                {dailyStats.canOpenGift ? 'Kattints' : 'Várj'}
+              </div>
+              <div className={`text-xs ${
+                dailyStats.canOpenGift 
+                  ? 'text-purple-600' 
+                  : 'text-gray-400'
+              }`}>
+                {dailyStats.canOpenGift ? 'Meglepetés!' : 'Holnapig'}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Login Streak Card */}
+        <Card className="p-4 border-2 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Flame className="w-6 h-6 text-orange-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-lg font-semibold truncate">🔥 Bejelentkezési Sorozat</div>
+                <div className="text-xl sm:text-2xl font-bold text-orange-600 truncate">
+                  {dailyStats.loginStreak} nap
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">
+                  Rekord: {dailyStats.longestStreak} nap
+                </div>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-2">
+              <div className="text-xs sm:text-sm text-muted-foreground">Jelenlegi</div>
+              <div className="text-xs text-orange-600">Sorozat</div>
             </div>
           </div>
         </Card>

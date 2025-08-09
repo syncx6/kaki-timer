@@ -46,35 +46,60 @@ export function Timer({ onOpenSettings, onOpenStats, onOpenAuth, onOpenOnlineLea
   const hourlyRate = salary / workHours;
   const currentEarnings = (seconds / 3600) * hourlyRate;
 
-  // Load sessions from localStorage and fetch kaki count
+  // Load sessions from Supabase for current user only and fetch kaki count
   useEffect(() => {
-    const saved = localStorage.getItem('wc-timer-sessions');
-    if (saved) {
-      const parsed = JSON.parse(saved).map((s: any) => ({
-        ...s,
-        startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
-      }));
-      setSessions(parsed);
-    }
+    const fetchUserData = async () => {
+      if (!user) {
+        setSessions([]);
+        setKakiCount(0);
+        return;
+      }
 
-    // Fetch user's kaki count if logged in
-    if (user) {
-      const fetchKakiCount = async () => {
-        try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('kaki_count')
-            .eq('user_id', user.id)
-            .single();
-          
-          setKakiCount(data?.kaki_count || 0);
-        } catch (error) {
-          console.error('Error fetching kaki count:', error);
+      try {
+        // Fetch user sessions from Supabase
+        const { data: sessionsData, error: sessionsError } = await supabase
+          .from('timer_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (sessionsError) {
+          console.error('Error fetching user sessions:', sessionsError);
+          setSessions([]);
+        } else {
+          const parsed = (sessionsData || []).map((s: any) => ({
+            id: s.id,
+            startTime: new Date(s.start_time),
+            endTime: new Date(s.end_time),
+            duration: s.duration,
+            earnedMoney: s.earned_money || 0,
+            kaki_earned: s.kaki_earned || 0,
+            username: s.user_id
+          }));
+          setSessions(parsed);
         }
-      };
-      fetchKakiCount();
-    }
+
+        // Fetch user's kaki count
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('kaki_count')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('Error fetching kaki count:', profileError);
+          setKakiCount(0);
+        } else {
+          setKakiCount(profileData?.kaki_count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setSessions([]);
+        setKakiCount(0);
+      }
+    };
+
+    fetchUserData();
   }, [user]);
 
   // Save sessions to localStorage

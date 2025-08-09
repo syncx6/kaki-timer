@@ -33,12 +33,27 @@ export function PVPLeaderboard({ open, onClose }: PVPLeaderboardProps) {
     try {
       setIsLoading(true);
       
-      // Get PVP challenges data
+      // Get PVP challenges data from Supabase
       const { data: pvpData, error: pvpError } = await supabase
         .from('pvp_challenges')
         .select('*');
 
       if (pvpError) throw pvpError;
+
+      // Get localStorage PVP data as well
+      const localStorageGames = JSON.parse(localStorage.getItem('wc-timer-pvp-games') || '[]');
+      
+      // Combine both data sources
+      const allPVPData = [
+        ...(pvpData || []),
+        ...localStorageGames.map((game: any) => ({
+          player_id: game.player_id,
+          opponent_id: game.opponent_id,
+          player_clicks: game.player_clicks,
+          opponent_clicks: game.opponent_clicks,
+          created_at: game.created_at
+        }))
+      ];
 
       // Get profiles data
       const { data: profiles, error: profileError } = await supabase
@@ -48,7 +63,7 @@ export function PVPLeaderboard({ open, onClose }: PVPLeaderboardProps) {
       if (profileError) throw profileError;
 
       // Calculate PVP stats for each user
-      const userStats = pvpData?.reduce((acc: Record<string, PVPLeaderboardEntry>, challenge) => {
+      const userStats = allPVPData?.reduce((acc: Record<string, PVPLeaderboardEntry>, challenge) => {
         const playerId = challenge.player_id;
         const opponentId = challenge.opponent_id;
         
@@ -148,49 +163,46 @@ export function PVPLeaderboard({ open, onClose }: PVPLeaderboardProps) {
           return b.kaki_earned - a.kaki_earned;
         })
         .slice(0, 5); // Top 5 only
+
+      // Fill empty slots with "n/a" if less than 5 players
+      const finalData = [...sortedStats];
+      while (finalData.length < 5) {
+        finalData.push({
+          user_id: `empty_${finalData.length}`,
+          username: 'n/a',
+          total_matches: 0,
+          wins: 0,
+          losses: 0,
+          win_rate: 0,
+          best_cps: 0,
+          average_cps: 0,
+          average_clicks: 0,
+          kaki_earned: 0,
+          kaki_lost: 0,
+        });
+      }
       
-      setLeaderboardData(sortedStats);
+      setLeaderboardData(finalData);
     } catch (error) {
       console.error('Error fetching PVP leaderboard:', error);
-      // Fallback to demo data
-      setLeaderboardData([
-        {
-          user_id: 'demo1',
-          username: 'PVP_Master',
-          total_matches: 15,
-          wins: 12,
-          losses: 3,
-          win_rate: 80,
-          best_cps: 8.5,
-          average_cps: 7.2,
-          kaki_earned: 36,
-          kaki_lost: 3,
-        },
-        {
-          user_id: 'demo2',
-          username: 'Click_Champion',
-          total_matches: 12,
-          wins: 9,
-          losses: 3,
-          win_rate: 75,
-          best_cps: 7.8,
-          average_cps: 6.5,
-          kaki_earned: 27,
-          kaki_lost: 3,
-        },
-        {
-          user_id: 'demo3',
-          username: 'Speed_Demon',
-          total_matches: 10,
-          wins: 7,
-          losses: 3,
-          win_rate: 70,
-          best_cps: 9.1,
-          average_cps: 7.8,
-          kaki_earned: 21,
-          kaki_lost: 3,
-        }
-      ]);
+      // Fallback to empty leaderboard with n/a entries
+      const emptyLeaderboard = [];
+      for (let i = 0; i < 5; i++) {
+        emptyLeaderboard.push({
+          user_id: `empty_${i}`,
+          username: 'n/a',
+          total_matches: 0,
+          wins: 0,
+          losses: 0,
+          win_rate: 0,
+          best_cps: 0,
+          average_cps: 0,
+          average_clicks: 0,
+          kaki_earned: 0,
+          kaki_lost: 0,
+        });
+      }
+      setLeaderboardData(emptyLeaderboard);
     } finally {
       setIsLoading(false);
     }

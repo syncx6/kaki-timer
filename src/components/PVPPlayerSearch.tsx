@@ -37,10 +37,10 @@ export function PVPPlayerSearch({ open, onClose, user, onChallengePlayer }: PVPP
     
     setIsLoading(true);
     try {
-      // Fetch profiles with basic stats
+      // Fetch profiles with basic stats and online status
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('user_id, username, kaki_count')
+        .select('user_id, username, kaki_count, is_online, last_seen')
         .neq('user_id', user.id)
         .ilike('username', `%${searchTerm}%`)
         .limit(20);
@@ -50,17 +50,33 @@ export function PVPPlayerSearch({ open, onClose, user, onChallengePlayer }: PVPP
         return;
       }
 
-      // Transform data to include PVP stats
-      const playersWithStats = profiles.map(profile => ({
-        id: profile.user_id,
-        username: profile.username,
-        kaki_count: profile.kaki_count || 0,
-        total_sessions: 0, // Will be calculated from timer_sessions
-        pvp_wins: 0, // Will be calculated from pvp_challenges
-        pvp_total: 0,
-        is_online: Math.random() > 0.5, // Mock online status
-        last_seen: new Date().toISOString()
-      }));
+      // Transform data to include PVP stats and real online status
+      const playersWithStats = profiles.map(profile => {
+        // Check if user is truly online (last seen within 2 minutes)
+        const lastSeen = new Date(profile.last_seen || 0);
+        const now = new Date();
+        const timeDiff = now.getTime() - lastSeen.getTime();
+        const isRecentlyActive = timeDiff < 2 * 60 * 1000; // 2 minutes
+        
+        console.log('Player:', profile.username, {
+          is_online: profile.is_online,
+          last_seen: profile.last_seen,
+          timeDiff: Math.floor(timeDiff / 1000),
+          isRecentlyActive,
+          finalStatus: profile.is_online && isRecentlyActive
+        });
+        
+        return {
+          id: profile.user_id,
+          username: profile.username,
+          kaki_count: profile.kaki_count || 0,
+          total_sessions: 0, // Will be calculated from timer_sessions
+          pvp_wins: 0, // Will be calculated from pvp_challenges
+          pvp_total: 0,
+          is_online: profile.is_online && isRecentlyActive,
+          last_seen: profile.last_seen || new Date().toISOString()
+        };
+      });
 
       setPlayers(playersWithStats);
     } catch (error) {
@@ -88,14 +104,44 @@ export function PVPPlayerSearch({ open, onClose, user, onChallengePlayer }: PVPP
     return true;
   });
 
-  const handleChallengePlayer = (playerId: string, playerName: string) => {
+  const handleChallengePlayer = async (playerId: string, playerName: string) => {
     console.log('Challenging player:', playerId, playerName);
     
-    // Close the dialog immediately
-    onClose();
+    const targetPlayer = players.find(p => p.id === playerId);
     
-    // For offline players, start game immediately
-    if (onChallengePlayer) {
+    if (targetPlayer?.is_online) {
+      // Online player - send real challenge
+      try {
+        const { data, error } = await supabase
+          .from('pvp_challenges')
+          .insert({
+            challenger_id: user?.id,
+            challenged_id: playerId,
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error sending challenge:', error);
+          return;
+        }
+
+        console.log('Challenge sent successfully:', data);
+        
+        // Close the dialog
+        onClose();
+        
+        // Show waiting message or start monitoring for response
+        // For now, we'll start the game immediately for testing
+        onChallengePlayer(playerId, playerName);
+        
+      } catch (error) {
+        console.error('Error sending challenge:', error);
+      }
+    } else {
+      // Offline player - start CPU game immediately
+      onClose();
       onChallengePlayer(playerId, playerName);
     }
   };

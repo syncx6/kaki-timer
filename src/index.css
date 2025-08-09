@@ -54,6 +54,20 @@
   }
 }
 
+/* Custom slow pulse animation for gift box */
+@keyframes slowPulse {
+  0%, 100% {
+    border-color: rgb(74 222 128); /* green-400 */
+  }
+  50% {
+    border-color: rgb(34 197 94); /* green-500 */
+  }
+}
+
+.animate-slow-pulse {
+  animation: slowPulse 3s ease-in-out infinite;
+}
+
 /* Tab content smooth transitions */
 [data-state="active"] {
   animation: fadeIn 0.2s ease-in-out;

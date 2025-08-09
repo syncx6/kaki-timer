@@ -8,9 +8,11 @@ import { ProfilePage } from '@/components/pages/ProfilePage';
 import { Auth } from '@/components/Auth';
 import { Statistics } from '@/components/Statistics';
 import { PVPGame } from '@/components/PVPGame';
+import { PVPChallengeNotification } from '@/components/PVPChallengeNotification';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useAchievements } from '@/hooks/use-achievements';
 import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
+import { useUserPresence } from '@/hooks/use-user-presence';
 import { SwipeIndicator } from '@/components/SwipeIndicator';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
@@ -32,6 +34,7 @@ const Index = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showPVPGame, setShowPVPGame] = useState(false);
+  const [challengeOpponent, setChallengeOpponent] = useState<{id: string, name: string} | null>(null);
   const [salary, setSalary] = useState(550000);
   const [workHours, setWorkHours] = useState(180);
   const [user, setUser] = useState<User | null>(null);
@@ -52,6 +55,49 @@ const Index = () => {
   // New hooks
   const notifications = useNotifications();
   const achievements = useAchievements(user);
+  const userPresence = useUserPresence({ user });
+
+  // Debug function for testing online status
+  useEffect(() => {
+    (window as any).debugOnlineStatus = async () => {
+      console.log('🔍 Debugging online status...');
+      try {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('user_id, username, is_online, last_seen')
+          .limit(10);
+        
+        if (error) {
+          console.error('❌ Error:', error);
+          return;
+        }
+        
+        console.log('📋 Profiles found:', profiles.length);
+        profiles.forEach(profile => {
+          const lastSeen = new Date(profile.last_seen || 0);
+          const now = new Date();
+          const timeDiff = Math.floor((now.getTime() - lastSeen.getTime()) / 1000);
+          
+          console.log(`👤 ${profile.username}:`, {
+            is_online: profile.is_online,
+            last_seen: profile.last_seen,
+            seconds_ago: timeDiff
+          });
+        });
+      } catch (error) {
+        console.error('❌ Debug failed:', error);
+      }
+    };
+
+    (window as any).forcePresenceUpdate = async () => {
+      if (user) {
+        console.log('🔄 Force updating presence for:', user.id);
+        await userPresence.updatePresence();
+      } else {
+        console.log('❌ No user logged in');
+      }
+    };
+  }, [user, userPresence]);
 
   // Navigation order for swipe gestures
   const navOrder: Array<'home' | 'games' | 'social' | 'profile'> = ['home', 'games', 'social', 'profile'];
@@ -135,18 +181,7 @@ const Index = () => {
     }
   }, [user]);
 
-  // Load sessions from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('wc-timer-sessions');
-    if (saved) {
-      const parsed = JSON.parse(saved).map((s: TimerSession) => ({
-        ...s,
-        startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
-      }));
-      setSessions(parsed);
-    }
-  }, []);
+  // Sessions are now loaded per-user in HomePage component - no global localStorage loading
 
   // Check for ongoing timer session on mount
   useEffect(() => {
@@ -391,6 +426,16 @@ const Index = () => {
     }
   };
 
+  const handleChallengeAccepted = (challengeId: string, challengerName: string) => {
+    setChallengeOpponent({ id: challengeId, name: challengerName });
+    setShowPVPGame(true);
+  };
+
+  const handlePVPGameClose = () => {
+    setShowPVPGame(false);
+    setChallengeOpponent(null);
+  };
+
   const handleStartTimer = () => {
     if (!user) {
       setShowAuth(true);
@@ -581,6 +626,12 @@ const Index = () => {
             onKakiUpdate={handleKakiUpdate}
             onNavigateToGames={() => setActiveTab('games')}
             onOpenPVPGame={() => setShowPVPGame(true)}
+            onPVPStatsRefresh={() => {
+              // Refresh PVP stats on HomePage when match completes
+              if (window.refreshHomePageStats) {
+                window.refreshHomePageStats();
+              }
+            }}
           />
         );
       case 'games':
@@ -675,10 +726,24 @@ const Index = () => {
       {/* PVP Game Dialog */}
       <PVPGame
         open={showPVPGame}
-        onClose={() => setShowPVPGame(false)}
+        onClose={handlePVPGameClose}
         user={user}
         username={username}
         onKakiUpdate={handleKakiUpdate}
+        challengeOpponent={challengeOpponent}
+        onPVPStatsUpdate={(won: boolean) => {
+          console.log('PVP match completed, won:', won);
+          // Refresh HomePage PVP stats
+          if (window.refreshHomePageStats) {
+            window.refreshHomePageStats();
+          }
+        }}
+      />
+
+      {/* PVP Challenge Notification */}
+      <PVPChallengeNotification
+        user={user}
+        onChallengeAccepted={handleChallengeAccepted}
       />
     </div>
   );

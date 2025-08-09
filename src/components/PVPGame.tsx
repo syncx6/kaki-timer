@@ -41,9 +41,11 @@ interface PVPGameProps {
   user: SupabaseUser | null;
   username: string;
   onKakiUpdate?: (change: number) => void; // Callback to update kaki count in parent
+  challengeOpponent?: {id: string, name: string} | null;
+  onPVPStatsUpdate?: (won: boolean) => void; // Callback to update PVP stats
 }
 
-export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGameProps) {
+export function PVPGame({ open, onClose, user, username, onKakiUpdate, challengeOpponent, onPVPStatsUpdate }: PVPGameProps) {
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'result'>('menu');
   const [timeLeft, setTimeLeft] = useState(8);
   const [clickCount, setClickCount] = useState(0);
@@ -62,6 +64,15 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
   const countdownRef = useRef<number>(8);
   const clickCountRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Auto-start game if challengeOpponent is provided
+  useEffect(() => {
+    if (challengeOpponent && open) {
+      setCurrentOpponent(challengeOpponent);
+      setGameState('playing');
+      startGame();
+    }
+  }, [challengeOpponent, open]);
 
   const startGame = () => {
     setGameState('playing');
@@ -209,6 +220,11 @@ export function PVPGame({ open, onClose, user, username, onKakiUpdate }: PVPGame
         // Call the kaki update callback
         if (onKakiUpdate) {
           onKakiUpdate(kakiChange);
+        }
+        
+        // Call the PVP stats update callback
+        if (onPVPStatsUpdate) {
+          onPVPStatsUpdate(isWinner);
         }
         
         // Refresh stats after save

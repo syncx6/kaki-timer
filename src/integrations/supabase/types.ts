@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_gifts: {
+        Row: {
+          gift_date: string
+          id: string
+          kaki_amount: number
+          opened_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          gift_date: string
+          id?: string
+          kaki_amount: number
+          opened_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          gift_date?: string
+          id?: string
+          kaki_amount?: number
+          opened_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_gifts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -50,27 +82,63 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          daily_gift_opened: boolean | null
+          daily_kaki_earned: number | null
           display_name: string | null
           id: string
+          is_online: boolean | null
           kaki_count: number | null
+          last_daily_reset: string | null
+          last_gift_date: string | null
+          last_login_date: string | null
+          last_seen: string | null
+          login_streak: number | null
+          longest_streak: number | null
+          pvp_total: number | null
+          pvp_win_rate: number | null
+          pvp_wins: number | null
           updated_at: string
           user_id: string
           username: string | null
         }
         Insert: {
           created_at?: string
+          daily_gift_opened?: boolean | null
+          daily_kaki_earned?: number | null
           display_name?: string | null
           id?: string
+          is_online?: boolean | null
           kaki_count?: number | null
+          last_daily_reset?: string | null
+          last_gift_date?: string | null
+          last_login_date?: string | null
+          last_seen?: string | null
+          login_streak?: number | null
+          longest_streak?: number | null
+          pvp_total?: number | null
+          pvp_win_rate?: number | null
+          pvp_wins?: number | null
           updated_at?: string
           user_id: string
           username?: string | null
         }
         Update: {
           created_at?: string
+          daily_gift_opened?: boolean | null
+          daily_kaki_earned?: number | null
           display_name?: string | null
           id?: string
+          is_online?: boolean | null
           kaki_count?: number | null
+          last_daily_reset?: string | null
+          last_gift_date?: string | null
+          last_login_date?: string | null
+          last_seen?: string | null
+          login_streak?: number | null
+          longest_streak?: number | null
+          pvp_total?: number | null
+          pvp_win_rate?: number | null
+          pvp_wins?: number | null
           updated_at?: string
           user_id?: string
           username?: string | null
@@ -123,6 +191,10 @@ export type Database = {
     Functions: {
       increment_kaki_count: {
         Args: { user_id: string; count: number }
+        Returns: undefined
+      }
+      reset_daily_counters: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
     }

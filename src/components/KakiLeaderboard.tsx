@@ -77,43 +77,40 @@ export function KakiLeaderboard({ open, onClose }: KakiLeaderboardProps) {
           return b.total_time - a.total_time;
         })
         .slice(0, 5); // Top 5 only
+
+      // Fill empty slots with "n/a" if less than 5 players
+      const finalData = [...sortedStats];
+      while (finalData.length < 5) {
+        finalData.push({
+          user_id: `empty_${finalData.length}`,
+          username: 'n/a',
+          kaki_count: 0,
+          total_sessions: 0,
+          total_time: 0,
+          average_time: 0,
+          best_time: 0,
+          kaki_per_hour: 0,
+        });
+      }
       
-      setLeaderboardData(sortedStats);
+      setLeaderboardData(finalData);
     } catch (error) {
       console.error('Error fetching kaki leaderboard:', error);
-      // Fallback to demo data
-      setLeaderboardData([
-        {
-          user_id: 'demo1',
-          username: 'Kaki_King',
-          kaki_count: 156,
-          total_sessions: 45,
-          total_time: 7200, // 2 hours
-          average_time: 160, // 2:40
-          best_time: 1800, // 30 minutes
-          kaki_per_hour: 78,
-        },
-        {
-          user_id: 'demo2',
-          username: 'Poop_Master',
-          kaki_count: 89,
-          total_sessions: 32,
-          total_time: 4800, // 1:20 hours
-          average_time: 150, // 2:30
-          best_time: 1200, // 20 minutes
-          kaki_per_hour: 67,
-        },
-        {
-          user_id: 'demo3',
-          username: 'Bathroom_Boss',
-          kaki_count: 67,
-          total_sessions: 28,
-          total_time: 3600, // 1 hour
-          average_time: 129, // 2:09
-          best_time: 900, // 15 minutes
-          kaki_per_hour: 67,
-        }
-      ]);
+      // Fallback to empty leaderboard with n/a entries
+      const emptyLeaderboard = [];
+      for (let i = 0; i < 5; i++) {
+        emptyLeaderboard.push({
+          user_id: `empty_${i}`,
+          username: 'n/a',
+          kaki_count: 0,
+          total_sessions: 0,
+          total_time: 0,
+          average_time: 0,
+          best_time: 0,
+          kaki_per_hour: 0,
+        });
+      }
+      setLeaderboardData(emptyLeaderboard);
     } finally {
       setIsLoading(false);
     }
